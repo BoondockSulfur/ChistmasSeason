@@ -1,0 +1,113 @@
+# ========================================
+# ChristmasSeason Plugin - English Texts
+# ========================================
+
+# General
+prefix: "&b[Xmas]&7"
+no-permission: "&cNo permission."
+
+# Commands - /xmas
+command:
+  usage: "&b/xmas &7<on|off|status|reload|biome|storm>"
+
+  # ON (Quotes needed because YAML interprets 'on' as boolean)
+  "on":
+    success: "&aEvent activated. &7(Snow features are running again)"
+
+  # OFF (Quotes needed because YAML interprets 'off' as boolean)
+  "off":
+    cleanup: "&7Removing event entities & items..."
+    success: "&cEvent deactivated. &7(Biomes & snow will be reset in batches)"
+
+  # STATUS
+  status:
+    message: "&bStatus: {0} &7| Snowstorm: {1}"
+    active: "&aON"
+    inactive: "&cOFF"
+
+  # RELOAD
+  reload:
+    success: "&aConfig reloaded."
+
+  # BIOME
+  biome:
+    usage: "&b/xmas biome &7<set|restore|clearsnap|status>"
+
+    set:
+      usage: "&b/xmas biome set &e<BIOME> &7[radius_chunks]"
+      unknown-biome: "&cUnknown biome."
+      invalid-radius: "&cInvalid number for radius."
+      success: "&aBiome set: &e{0} &7chunk(s)."
+
+    restore:
+      success: "&aBiomes restored from seed: &e{0} &7chunk(s)."
+
+    clearsnap:
+      success: "&aSnapshot deleted."
+
+    status:
+      message: "&bBiomeSnapshot: &e{0} &7active"
+
+  # STORM
+  storm:
+    usage: "&b/xmas storm &7<on|off|toggle|status|pulse>"
+
+    "on": "&bSnowstorm: &aON"
+    "off": "&bSnowstorm: &cOFF"
+    toggle: "&bSnowstorm: {0}"
+    status: "&bSnowstorm: {0}"
+
+    pulse:
+      success: "&bSnowstorm: &e{0}&7s pulse."
+      invalid-duration: "&cInvalid number for seconds."
+      world-not-found: "&cTarget world not found."
+
+# Commands - /xmasgift
+gift:
+  spawned: "&aGift spawned!"
+
+# Entity Names
+entity:
+  wichtel: "&aElf"
+  elf: "&bHelper Elf"
+  snowman: "&fSnowman"
+  decoration: "&aChristmas Decoration"
+  gift-chest: "&c&lChristmas Gift"
+
+# Broadcast Messages
+broadcast:
+  gift-spawned: "&c🎁 A Christmas gift appeared in &e{0} &cat &e{1} {2} {3}&c!"
+
+# Manager Logs (Console)
+log:
+  language-loaded: "Language loaded: {0}"
+
+  cleanup:
+    decorations: "Decorations removed: {0}"
+    gifts: "Gifts removed: {0}"
+    wichtel: "Wichtel & Elves removed: {0} (Tracked: {1} Wichtel, {2} Elves)"
+    snowmen: "Snowmen removed: {0}"
+
+    world-not-found: "{0} cleanup: World not found!"
+
+  biome:
+    snapshot-empty: "Biome snapshot is empty! Reset not possible. Was the event started?"
+    reset-start: "Starting biome reset for {0} chunks..."
+    reset-complete: "Biome reset completed!"
+    ice-removed-debug: "Removing ice in biome: {0} (isIcy={1})"
+
+  # Debug Logs (only visible with /xmas debug verbose)
+  debug:
+    restore:
+      chunk: "[RESTORE] Restoring chunk {0},{1}"
+      snapshot-info: "[RESTORE] Snapshot: yStart={0}, yStep={1}, layers={2}"
+      biomes-found: "[RESTORE] Snapshot contains biomes: {0}"
+      complete: "[RESTORE] Restored: {0} biome positions"
+
+    snapshot:
+      creating: "[SNAPSHOT] Creating 3D snapshot for chunk {0},{1}"
+      biomes-found: "[SNAPSHOT] Found biomes: {0}"
+      warning-snowy: "[SNAPSHOT] WARNING: Chunk {0},{1} is already SNOWY_PLAINS!"
+      warning-false-data: "[SNAPSHOT] Snapshot would save WRONG data!"
+      warning-skipped: "[SNAPSHOT] → Snapshot SKIPPED!"
+      saved: "[SNAPSHOT] Saved: {0},{1} ({2} layers)"

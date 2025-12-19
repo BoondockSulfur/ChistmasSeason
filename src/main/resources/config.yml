@@ -1,0 +1,102 @@
+active: false
+snowWorld: "world"
+language: "de"  # de = Deutsch, en = English
+
+biome:
+  enabled: true
+  target: "SNOWY_PLAINS"
+
+  # PERFORMANCE: SQLite-basiertes Snapshot-System (v1.3+)
+  # Ersetzt das alte YAML-System mit folgenden Vorteilen:
+  # - Unbegrenzte Chunk-Anzahl (kein 2000-Limit!)
+  # - Komprimierte Speicherung (~5-10 MB statt 156 MB für 10k Chunks)
+  # - Schnelles Laden/Speichern (Millisekunden statt Sekunden)
+  # - Kein Memory-Overhead beim Laden
+  enableSnapshot: true      # false = kein automatisches Restore möglich!
+
+  playerBubble:
+    enabled: true
+    radiusChunks: 2         # Radius in Chunks (2 = 5x5 = 25 chunks)
+    refreshClient: true     # Client-Refresh für sofortige Biom-Updates
+    tickIntervalTicks: 40   # Wie oft in Ticks (40 = 2 Sekunden)
+    perTickBudget: 12       # Max Chunks pro Tick (12 = schneller, 6 = smooth, 3 = sicher bei TPS-Problemen)
+  restore:
+    perTick: 4              # Chunks pro Tick bei /xmas off
+
+snowstorm:
+  enabled: true
+  forceWeatherTicks: 200
+  mode: auto
+  auto:
+    onSeconds: 150
+    offSeconds: 45
+
+decoration:
+  enabled: true
+  intervalSeconds: 35
+  spawnChance: 0.35
+  lifetimeSeconds: 180
+  glow: true
+  pickupDelayTicks: 0
+  drops:
+    - RED_CANDLE:2
+    - GREEN_CANDLE:2
+    - SWEET_BERRIES:6
+    - COOKIE:5
+    - SNOWBALL:12
+    - SPRUCE_SAPLING:1
+
+gifts:
+  enabled: true
+  globalIntervalSeconds: 160
+  chancePerInterval: 0.35
+  lifetimeSeconds: 300
+  broadcastOnSpawn: true
+  lootTables:
+    common:
+      - COOKIE:8
+      - SWEET_BERRIES:12
+      - PUMPKIN_PIE:4
+      - CAKE:1
+      - COCOA_BEANS:16
+      - BREAD:4
+      - COOKED_BEEF:4
+      - APPLE:6
+      - SNOWBALL:16
+      - PACKED_ICE:4
+    extra:
+      - SPRUCE_LEAVES:32
+      - SPRUCE_SAPLING:4
+      - RED_WOOL:16
+      - GREEN_WOOL:16
+      - RED_CARPET:12
+      - GREEN_CARPET:12
+      - CANDLE:6
+    rare:
+      - DIAMOND:1
+      - EMERALD:4
+      - GOLDEN_APPLE:2
+      - ENCHANTED_GOLDEN_APPLE:1
+      - NETHERITE_SCRAP:1
+      - NAME_TAG:1
+
+wichtel:
+  enabled: true
+  spawnIntervalSeconds: 45
+  maxPerWorld: 6
+  stealRadius: 3.2
+  lifetimeSeconds: 240
+  world: "world"
+
+elves:
+  enabled: true
+  spawnIntervalSeconds: 60
+  maxPerWorld: 4
+
+snowmen:
+  enabled: true
+  spawnIntervalSeconds: 45
+  maxPerWorld: 6
+  attackIntervalSeconds: 8
+  attackChance: 0.15
+  range: 12.0
