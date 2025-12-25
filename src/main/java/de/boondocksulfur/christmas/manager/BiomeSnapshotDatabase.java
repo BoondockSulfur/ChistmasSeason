@@ -37,7 +37,7 @@ public class BiomeSnapshotDatabase {
         try {
             Class.forName("org.sqlite.JDBC");
         } catch (ClassNotFoundException e) {
-            plugin.getLogger().severe("SQLite JDBC Driver nicht gefunden! Plugin kann nicht funktionieren.");
+            plugin.getLogger().severe(plugin.getLanguageManager().get("log.database.jdbc-not-found"));
             throw new SQLException("SQLite driver not found", e);
         }
 
@@ -53,7 +53,7 @@ public class BiomeSnapshotDatabase {
         }
 
         createTable();
-        plugin.getLogger().info("Biome-Snapshot Datenbank geöffnet: " + dbFile.getName());
+        plugin.getLogger().info(plugin.getLanguageManager().getMessage("log.database.opened", dbFile.getName()));
     }
 
     /**
@@ -218,7 +218,7 @@ public class BiomeSnapshotDatabase {
             stmt.execute("VACUUM");
         }
 
-        plugin.getLogger().info("Biome-Snapshot Datenbank geleert.");
+        plugin.getLogger().info(plugin.getLanguageManager().get("log.database.cleared"));
     }
 
     /**
@@ -228,9 +228,9 @@ public class BiomeSnapshotDatabase {
         if (connection != null) {
             try {
                 connection.close();
-                plugin.getLogger().info("Biome-Snapshot Datenbank geschlossen.");
+                plugin.getLogger().info(plugin.getLanguageManager().get("log.database.closed"));
             } catch (SQLException e) {
-                plugin.getLogger().warning("Fehler beim Schließen der Datenbank: " + e.getMessage());
+                plugin.getLogger().warning(plugin.getLanguageManager().getMessage("log.database.error-closing", e.getMessage()));
             }
         }
     }
@@ -259,7 +259,7 @@ public class BiomeSnapshotDatabase {
             return baos.toByteArray();
 
         } catch (Exception e) {
-            plugin.getLogger().severe("Fehler beim Komprimieren von Biome-Daten: " + e.getMessage());
+            plugin.getLogger().severe(plugin.getLanguageManager().getMessage("log.database.error-compressing", e.getMessage()));
             throw new RuntimeException(e);
         }
     }
@@ -278,15 +278,15 @@ public class BiomeSnapshotDatabase {
                 // Lese Länge des Namens
                 int nameLength = gzip.read();
                 if (nameLength == -1) {
-                    plugin.getLogger().warning("Unerwartetes Ende beim Dekomprimieren von Biome-Daten!");
+                    plugin.getLogger().warning(plugin.getLanguageManager().get("log.database.unexpected-end-decompress"));
                     biomes[i] = Biome.PLAINS; // Fallback
                     continue;
                 }
 
                 // VALIDATION: Biome-Namen sollten maximal 50 Zeichen sein
                 if (nameLength > 50) {
-                    plugin.getLogger().severe("KORRUPTE DATENBANK: Biome-Namenslänge zu groß (" + nameLength + " bytes) @ Index=" + i);
-                    plugin.getLogger().severe("Stream-Misalignment erkannt! Datenbank ist beschädigt.");
+                    plugin.getLogger().severe(plugin.getLanguageManager().getMessage("log.database.corrupted-name-too-long", nameLength));
+                    plugin.getLogger().severe(plugin.getLanguageManager().get("log.database.stream-misalignment"));
                     throw new RuntimeException("Database corruption detected - stream misalignment");
                 }
 
@@ -297,7 +297,7 @@ public class BiomeSnapshotDatabase {
                 while (totalRead < nameLength) {
                     int bytesRead = gzip.read(nameBytes, totalRead, nameLength - totalRead);
                     if (bytesRead == -1) {
-                        plugin.getLogger().warning("Stream endete vorzeitig beim Lesen von Biome-Name! Erwartet=" + nameLength + " Gelesen=" + totalRead);
+                        plugin.getLogger().warning(plugin.getLanguageManager().getMessage("log.database.stream-premature-end", nameLength, totalRead));
                         biomes[i] = Biome.PLAINS;
                         break;
                     }
@@ -315,11 +315,11 @@ public class BiomeSnapshotDatabase {
                 try {
                     biomes[i] = org.bukkit.Registry.BIOME.get(org.bukkit.NamespacedKey.minecraft(biomeName.toLowerCase()));
                     if (biomes[i] == null) {
-                        plugin.getLogger().warning("Unbekannter Biome-Name: " + biomeName + " - verwende PLAINS");
+                        plugin.getLogger().warning(plugin.getLanguageManager().getMessage("log.database.unknown-biome-name", biomeName));
                         biomes[i] = Biome.PLAINS;
                     }
                 } catch (Exception e) {
-                    plugin.getLogger().warning("Fehler beim Laden von Biome: " + biomeName + " - verwende PLAINS");
+                    plugin.getLogger().warning(plugin.getLanguageManager().getMessage("log.database.error-loading-biome", biomeName));
                     biomes[i] = Biome.PLAINS; // Fallback
                 }
             }
@@ -327,7 +327,7 @@ public class BiomeSnapshotDatabase {
             return biomes;
 
         } catch (Exception e) {
-            plugin.getLogger().severe("Fehler beim Dekomprimieren von Biome-Daten: " + e.getMessage());
+            plugin.getLogger().severe(plugin.getLanguageManager().getMessage("log.database.error-decompressing", e.getMessage()));
             throw new RuntimeException(e);
         }
     }
@@ -363,7 +363,7 @@ public class BiomeSnapshotDatabase {
                         // NULL-CHECK: Fallback zu PLAINS wenn Biome null ist
                         Biome biome = biomes3D[y][x][z];
                         if (biome == null) {
-                            plugin.getLogger().warning("NULL Biome bei Snapshot-Erstellung @ Layer=" + y + " X=" + x + " Z=" + z + " - verwende PLAINS");
+                            plugin.getLogger().warning(plugin.getLanguageManager().getMessage("log.database.null-biome-snapshot", y, x, z));
                             biome = Biome.PLAINS;
                         }
 
@@ -383,7 +383,7 @@ public class BiomeSnapshotDatabase {
             return baos.toByteArray();
 
         } catch (Exception e) {
-            plugin.getLogger().severe("Fehler beim Komprimieren von 3D Biome-Daten: " + e.getMessage());
+            plugin.getLogger().severe(plugin.getLanguageManager().getMessage("log.database.error-compressing-3d", e.getMessage()));
             throw new RuntimeException(e);
         }
     }
@@ -399,7 +399,7 @@ public class BiomeSnapshotDatabase {
             // Magic byte prüfen
             int magic = gzip.read();
             if (magic != 0x3D && magic != 0x3E) {
-                plugin.getLogger().severe("Kein 3D-Format erkannt! Magic byte: " + magic);
+                plugin.getLogger().severe(plugin.getLanguageManager().getMessage("log.database.invalid-3d-format", magic));
                 throw new RuntimeException("Invalid 3D biome format - expected 0x3D or 0x3E, got " + magic);
             }
 
@@ -429,14 +429,14 @@ public class BiomeSnapshotDatabase {
                         for (int z = 0; z < 16; z++) {
                             int nameLength = gzip.read();
                             if (nameLength == -1) {
-                                plugin.getLogger().warning("Unerwartetes Ende in 3D Biome-Daten!");
+                                plugin.getLogger().warning(plugin.getLanguageManager().get("log.database.unexpected-end-3d"));
                                 biomes[y][x][z] = Biome.PLAINS;
                                 continue;
                             }
 
                             // Leerer Name? → Fallback zu PLAINS
                             if (nameLength == 0) {
-                                plugin.getLogger().warning("Leerer 3D Biome-Name @ Layer=" + y + " X=" + x + " Z=" + z + " - verwende PLAINS");
+                                plugin.getLogger().warning(plugin.getLanguageManager().getMessage("log.database.empty-3d-name", y, x, z));
                                 biomes[y][x][z] = Biome.PLAINS;
                                 continue;
                             }
@@ -444,9 +444,9 @@ public class BiomeSnapshotDatabase {
                             // VALIDATION: Biome-Namen sollten maximal 50 Zeichen sein
                             // Wenn länger, ist vermutlich der Stream korrupt (Misalignment!)
                             if (nameLength > 50) {
-                                plugin.getLogger().severe("KORRUPTE DATENBANK: Biome-Namenslänge zu groß (" + nameLength + " bytes) @ Layer=" + y + " X=" + x + " Z=" + z);
-                                plugin.getLogger().severe("Stream-Misalignment erkannt! Datenbank ist beschädigt.");
-                                plugin.getLogger().severe("Lösung: /xmas biome clearsnap und Chunks neu laden für frischen Snapshot");
+                                plugin.getLogger().severe(plugin.getLanguageManager().getMessage("log.database.corrupted-3d-name-too-long", nameLength, y, x, z));
+                                plugin.getLogger().severe(plugin.getLanguageManager().get("log.database.stream-misalignment-3d"));
+                                plugin.getLogger().severe(plugin.getLanguageManager().get("log.database.solution-clearsnap"));
                                 throw new RuntimeException("Database corruption detected - stream misalignment");
                             }
 
@@ -458,7 +458,7 @@ public class BiomeSnapshotDatabase {
                                 int bytesRead = gzip.read(nameBytes, totalRead, nameLength - totalRead);
                                 if (bytesRead == -1) {
                                     // Stream ended prematurely
-                                    plugin.getLogger().warning("Stream endete vorzeitig beim Lesen von Biome-Name! Erwartet=" + nameLength + " Gelesen=" + totalRead);
+                                    plugin.getLogger().warning(plugin.getLanguageManager().getMessage("log.database.stream-premature-end", nameLength, totalRead));
                                     biomes[y][x][z] = Biome.PLAINS;
                                     break; // Abbruch - Stream ist zu Ende
                                 }
@@ -474,7 +474,7 @@ public class BiomeSnapshotDatabase {
 
                             // Prüfe ob Name leer oder null ist
                             if (biomeName == null || biomeName.trim().isEmpty()) {
-                                plugin.getLogger().warning("Ungültiger 3D Biome-Name (leer/null) - verwende PLAINS");
+                                plugin.getLogger().warning(plugin.getLanguageManager().get("log.database.invalid-3d-name-empty"));
                                 biomes[y][x][z] = Biome.PLAINS;
                                 continue;
                             }
@@ -483,14 +483,14 @@ public class BiomeSnapshotDatabase {
                                 // Use Registry instead of deprecated valueOf
                                 Biome biome = org.bukkit.Registry.BIOME.get(org.bukkit.NamespacedKey.minecraft(biomeName.toLowerCase()));
                                 if (biome == null) {
-                                    plugin.getLogger().warning("Unbekannter 3D Biome-Name: '" + biomeName + "' - verwende PLAINS");
+                                    plugin.getLogger().warning(plugin.getLanguageManager().getMessage("log.database.unknown-3d-biome", biomeName));
                                     biomes[y][x][z] = Biome.PLAINS;
                                 } else {
                                     biomes[y][x][z] = biome;
                                 }
                             } catch (Exception e) {
                                 // Fange ALLE Exceptions (inkl. NullPointerException bei NamespacedKey)
-                                plugin.getLogger().warning("Fehler beim Parsen von Biome-Name '" + biomeName + "': " + e.getClass().getSimpleName() + " - verwende PLAINS");
+                                plugin.getLogger().warning(plugin.getLanguageManager().getMessage("log.database.error-parsing-biome", biomeName, e.getClass().getSimpleName()));
                                 biomes[y][x][z] = Biome.PLAINS;
                             }
                         }
@@ -498,7 +498,7 @@ public class BiomeSnapshotDatabase {
                 }
             } else {
                 // ALTES FORMAT: Ordinal-basiert (instabil - nur für Kompatibilität)
-                plugin.getLogger().warning("Lade Snapshot im alten Ordinal-Format - kann fehlerhaft sein!");
+                plugin.getLogger().warning(plugin.getLanguageManager().get("log.database.old-format-warning"));
                 // Use Registry stream instead of deprecated values()
                 Biome[] allBiomes = org.bukkit.Registry.BIOME.stream().toArray(Biome[]::new);
 
@@ -509,14 +509,14 @@ public class BiomeSnapshotDatabase {
                             int ordinalLo = gzip.read();
 
                             if (ordinalHi == -1 || ordinalLo == -1) {
-                                plugin.getLogger().warning("Unerwartetes Ende in 3D Biome-Daten!");
+                                plugin.getLogger().warning(plugin.getLanguageManager().get("log.database.unexpected-end-3d"));
                                 biomes[y][x][z] = Biome.PLAINS;
                             } else {
                                 int ordinal = (ordinalHi << 8) | ordinalLo;
                                 if (ordinal < allBiomes.length) {
                                     biomes[y][x][z] = allBiomes[ordinal];
                                 } else {
-                                    plugin.getLogger().warning("Ungültiger Biome-Ordinal: " + ordinal);
+                                    plugin.getLogger().warning(plugin.getLanguageManager().getMessage("log.database.invalid-biome-ordinal", ordinal, allBiomes.length));
                                     biomes[y][x][z] = Biome.PLAINS;
                                 }
                             }
@@ -528,7 +528,7 @@ public class BiomeSnapshotDatabase {
             return new BiomeSnapshot3D(biomes, yStart, yStep);
 
         } catch (Exception e) {
-            plugin.getLogger().severe("Fehler beim Dekomprimieren von 3D Biome-Daten: " + e.getMessage());
+            plugin.getLogger().severe(plugin.getLanguageManager().getMessage("log.database.error-decompressing-3d", e.getMessage()));
             throw new RuntimeException(e);
         }
     }
@@ -578,19 +578,19 @@ public class BiomeSnapshotDatabase {
             long sizeBytes = getDatabaseSize();
             double sizeMB = sizeBytes / (1024.0 * 1024.0);
 
-            plugin.getLogger().info("=== Biome-Snapshot Statistiken ===");
-            plugin.getLogger().info("Gespeicherte Chunks: " + count);
-            plugin.getLogger().info("Datenbankgröße: " + String.format("%.2f MB", sizeMB));
+            plugin.getLogger().info(plugin.getLanguageManager().get("log.database.stats-header"));
+            plugin.getLogger().info(plugin.getLanguageManager().getMessage("log.database.stored-chunks", count));
+            plugin.getLogger().info(plugin.getLanguageManager().getMessage("log.database.database-size", String.format("%.2f", sizeMB)));
 
             if (count > 0) {
                 double avgBytesPerChunk = (double) sizeBytes / count;
-                plugin.getLogger().info("Durchschnitt pro Chunk: " + String.format("%.2f KB", avgBytesPerChunk / 1024.0));
+                plugin.getLogger().info(plugin.getLanguageManager().getMessage("log.database.average-per-chunk", String.format("%.2f", avgBytesPerChunk / 1024.0)));
             }
 
-            plugin.getLogger().info("==================================");
+            plugin.getLogger().info(plugin.getLanguageManager().get("log.database.stats-footer"));
 
         } catch (SQLException e) {
-            plugin.getLogger().warning("Fehler beim Abrufen der Statistiken: " + e.getMessage());
+            plugin.getLogger().warning(plugin.getLanguageManager().getMessage("log.database.error-retrieving-stats", e.getMessage()));
         }
     }
 }

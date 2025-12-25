@@ -27,6 +27,9 @@ public class DecorationManager {
     // FOLIA FIX: Player-basierte Spawn-Timer (Entity Scheduler)
     private final java.util.Map<java.util.UUID, WrappedTask> playerSpawnTasks = new java.util.concurrent.ConcurrentHashMap<>();
 
+    // FOLIA FIX: Track spawned decorations by UUID for safe cleanup
+    private final java.util.Set<java.util.UUID> trackedDecorations = java.util.concurrent.ConcurrentHashMap.newKeySet();
+
     public DecorationManager(ChristmasSeason plugin) {
         this.plugin = plugin;
         this.lang = plugin.getLanguageManager();
@@ -45,6 +48,7 @@ public class DecorationManager {
             if (task != null) task.cancel();
         }
         playerSpawnTasks.clear();
+        // Note: trackedDecorations wird NICHT geleert - bleibt für cleanup() erhalten
     }
 
     /**
@@ -88,26 +92,36 @@ public class DecorationManager {
         }
     }
 
-    /** Entfernt alle Dekorations-Items aus der Welt */
+    /**
+     * Entfernt alle Dekorations-Items aus der Welt
+     * FOLIA-SAFE: Verwendet tracked UUIDs und schedult Entfernung pro Entity
+     */
     public void cleanup() {
-        String worldName = plugin.getConfig().getString("snowWorld", "world");
-        World w = Bukkit.getWorld(worldName);
-        if (w == null) {
-            plugin.getLogger().warning(lang.getMessage("log.cleanup.world-not-found", "Decoration"));
-            return;
-        }
-
-        String name = lang.get("entity.decoration");
         int removed = 0;
+        int tracked = trackedDecorations.size();
 
-        // OPTIMIERT: Verwende getEntitiesByClass statt w.getEntities() - viel schneller!
-        for (Item item : w.getEntitiesByClass(Item.class)) {
-            if (item.getCustomName() != null && item.getCustomName().equals(name)) {
-                item.remove();
+        // FOLIA FIX: Iteriere über tracked UUIDs statt w.getEntitiesByClass()
+        java.util.Iterator<java.util.UUID> it = trackedDecorations.iterator();
+        while (it.hasNext()) {
+            java.util.UUID uuid = it.next();
+            org.bukkit.entity.Entity entity = Bukkit.getEntity(uuid);
+
+            if (entity != null && entity.isValid() && entity instanceof Item) {
+                // FOLIA FIX: Schedule removal auf Entity Scheduler
+                scheduler.runForEntity(entity, () -> {
+                    if (!entity.isDead() && entity.isValid()) {
+                        entity.remove();
+                    }
+                });
                 removed++;
             }
+            it.remove(); // Aus Tracking entfernen
         }
+
         plugin.getLogger().info(lang.getMessage("log.cleanup.decorations", removed));
+        if (tracked > removed && plugin.isDebugMode()) {
+            plugin.debug("Decorations: " + removed + " removed, " + (tracked - removed) + " already gone");
+        }
     }
 
     /**
@@ -147,8 +161,16 @@ public class DecorationManager {
             item.setPickupDelay(plugin.getConfig().getInt("decoration.pickupDelayTicks", 0));
             try { item.setGlowing(plugin.getConfig().getBoolean("decoration.glow", true)); } catch (Throwable ignored) {}
 
+            // FOLIA FIX: Track spawned decoration
+            trackedDecorations.add(item.getUniqueId());
+
             int lifetime = plugin.getConfig().getInt("decoration.lifetimeSeconds", 180);
-            scheduler.runForEntityLater(item, () -> { if (!item.isDead() && item.isValid()) item.remove(); }, lifetime * 20L);
+            scheduler.runForEntityLater(item, () -> {
+                if (!item.isDead() && item.isValid()) {
+                    item.remove();
+                    trackedDecorations.remove(item.getUniqueId()); // Remove from tracking
+                }
+            }, lifetime * 20L);
         });
     }
 }

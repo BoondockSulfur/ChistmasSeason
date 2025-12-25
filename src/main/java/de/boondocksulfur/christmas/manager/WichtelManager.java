@@ -128,23 +128,43 @@ public class WichtelManager {
         int wichtelCount = trackedWichtel.size();
         int elfenCount = trackedElfen.size();
 
-        // Wichtel entfernen
+        // FOLIA FIX: Wichtel entfernen (Entity Scheduler)
         Iterator<UUID> wit = trackedWichtel.iterator();
         while (wit.hasNext()) {
-            Entity e = Bukkit.getEntity(wit.next());
+            UUID uuid = wit.next();
+            Entity e = Bukkit.getEntity(uuid);
             if (e != null && e.isValid()) {
-                e.remove();
+                // FOLIA FIX: Cancel steal task if exists
+                WrappedTask stealTask = entityStealTasks.remove(uuid);
+                if (stealTask != null) stealTask.cancel();
+
+                // FOLIA FIX: Schedule removal on entity's thread
+                scheduler.runForEntity(e, () -> {
+                    if (!e.isDead() && e.isValid()) {
+                        e.remove();
+                    }
+                });
                 removed++;
             }
             wit.remove();
         }
 
-        // Elfen entfernen
+        // FOLIA FIX: Elfen entfernen (Entity Scheduler)
         Iterator<UUID> eit = trackedElfen.iterator();
         while (eit.hasNext()) {
-            Entity e = Bukkit.getEntity(eit.next());
+            UUID uuid = eit.next();
+            Entity e = Bukkit.getEntity(uuid);
             if (e != null && e.isValid()) {
-                e.remove();
+                // FOLIA FIX: Cancel steal task if exists
+                WrappedTask stealTask = entityStealTasks.remove(uuid);
+                if (stealTask != null) stealTask.cancel();
+
+                // FOLIA FIX: Schedule removal on entity's thread
+                scheduler.runForEntity(e, () -> {
+                    if (!e.isDead() && e.isValid()) {
+                        e.remove();
+                    }
+                });
                 removed++;
             }
             eit.remove();

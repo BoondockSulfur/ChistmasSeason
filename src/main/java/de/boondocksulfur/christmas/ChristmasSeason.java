@@ -101,11 +101,22 @@ public class ChristmasSeason extends JavaPlugin {
         java.io.File file = new java.io.File(getDataFolder(), fileName);
         if (!file.exists()) {
             try {
+                // Prüfe ob Ressource im JAR existiert
+                java.io.InputStream resource = getResource(fileName);
+                if (resource == null) {
+                    getLogger().severe("Resource not found in JAR: " + fileName);
+                    return;
+                }
+                resource.close();
+
                 saveResource(fileName, false);
-                getLogger().info("Extracted resource: " + fileName);
+                getLogger().info("Extracted resource: " + fileName + " (Size: " + file.length() + " bytes)");
             } catch (Exception e) {
-                getLogger().warning("Could not extract " + fileName + ": " + e.getMessage());
+                getLogger().severe("Could not extract " + fileName + ": " + e.getMessage());
+                e.printStackTrace();
             }
+        } else {
+            getLogger().info("Resource already exists: " + fileName + " (Size: " + file.length() + " bytes)");
         }
     }
 

@@ -36,6 +36,10 @@ public class LanguageManager {
         String fileName = "messages_" + currentLanguage + ".yml";
         File langFile = new File(plugin.getDataFolder(), fileName);
 
+        plugin.getLogger().info("Loading language: " + currentLanguage);
+        plugin.getLogger().info("Language file path: " + langFile.getAbsolutePath());
+        plugin.getLogger().info("File exists: " + langFile.exists() + ", Size: " + (langFile.exists() ? langFile.length() : "N/A") + " bytes");
+
         // Versuche die Datei zu laden
         if (langFile.exists() && langFile.length() > 0) {
             messages = YamlConfiguration.loadConfiguration(langFile);
@@ -47,10 +51,13 @@ public class LanguageManager {
                     new InputStreamReader(defConfigStream, StandardCharsets.UTF_8)
                 );
                 messages.setDefaults(defConfig);
+                plugin.getLogger().info("Loaded defaults from JAR resource: " + fileName);
+            } else {
+                plugin.getLogger().warning("Could not load defaults from JAR for: " + fileName);
             }
 
             int keyCount = messages.getKeys(true).size();
-            plugin.getLogger().info("Language loaded: " + currentLanguage + " (" + keyCount + " keys)");
+            plugin.getLogger().info("Language loaded from disk: " + currentLanguage + " (" + keyCount + " keys)");
         } else {
             // Fallback: Lade direkt aus JAR wenn Datei nicht existiert
             plugin.getLogger().warning("Language file not found on disk, loading from JAR: " + fileName);
@@ -63,6 +70,16 @@ public class LanguageManager {
                 plugin.getLogger().info("Language loaded from JAR: " + currentLanguage + " (" + keyCount + " keys)");
             } else {
                 plugin.getLogger().severe("Language file not found anywhere: " + fileName);
+                plugin.getLogger().severe("Available resources in plugin JAR:");
+                // Versuche verfügbare Ressourcen aufzulisten
+                try {
+                    java.util.Enumeration<java.net.URL> resources = plugin.getClass().getClassLoader().getResources("");
+                    while (resources.hasMoreElements()) {
+                        plugin.getLogger().severe("  - " + resources.nextElement().toString());
+                    }
+                } catch (Exception e) {
+                    plugin.getLogger().severe("Could not list resources: " + e.getMessage());
+                }
                 messages = new YamlConfiguration(); // Leere Config als Notfall
             }
         }

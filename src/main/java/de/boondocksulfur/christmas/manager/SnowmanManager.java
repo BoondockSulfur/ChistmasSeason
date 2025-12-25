@@ -28,6 +28,9 @@ public class SnowmanManager {
     // FOLIA FIX: Entity-basierte Attack-Tasks (Entity Scheduler pro Schneemann)
     private final java.util.Map<java.util.UUID, WrappedTask> entityAttackTasks = new java.util.concurrent.ConcurrentHashMap<>();
 
+    // FOLIA FIX: Track spawned snowmen by UUID for safe cleanup and counting
+    private final java.util.Set<java.util.UUID> trackedSnowmen = java.util.concurrent.ConcurrentHashMap.newKeySet();
+
     public SnowmanManager(ChristmasSeason plugin) {
         this.plugin = plugin;
         this.lang = plugin.getLanguageManager();
@@ -55,6 +58,7 @@ public class SnowmanManager {
             if (task != null) task.cancel();
         }
         entityAttackTasks.clear();
+        // Note: trackedSnowmen wird NICHT geleert - bleibt für cleanup() erhalten
     }
 
     /**
@@ -94,23 +98,40 @@ public class SnowmanManager {
         }
     }
 
-    /** Entfernt alle Schneemänner aus der Welt */
+    /**
+     * Entfernt alle Schneemänner aus der Welt
+     * FOLIA-SAFE: Verwendet tracked UUIDs und schedult Entfernung pro Entity
+     */
     public void cleanup() {
-        String worldName = plugin.getConfig().getString("snowWorld", "world");
-        World w = Bukkit.getWorld(worldName);
-        if (w == null) {
-            plugin.getLogger().warning("Schneemann-Cleanup: Welt nicht gefunden!");
-            return;
-        }
-
         int removed = 0;
-        for (Snowman sm : w.getEntitiesByClass(Snowman.class)) {
-            if (sm.getScoreboardTags().contains(TAG)) {
-                sm.remove();
+        int tracked = trackedSnowmen.size();
+
+        // FOLIA FIX: Iteriere über tracked UUIDs statt w.getEntitiesByClass()
+        java.util.Iterator<java.util.UUID> it = trackedSnowmen.iterator();
+        while (it.hasNext()) {
+            java.util.UUID uuid = it.next();
+            org.bukkit.entity.Entity entity = Bukkit.getEntity(uuid);
+
+            if (entity != null && entity.isValid() && entity instanceof Snowman) {
+                // FOLIA FIX: Cancel attack task if exists
+                WrappedTask attackTask = entityAttackTasks.remove(uuid);
+                if (attackTask != null) attackTask.cancel();
+
+                // FOLIA FIX: Schedule removal auf Entity Scheduler
+                scheduler.runForEntity(entity, () -> {
+                    if (!entity.isDead() && entity.isValid()) {
+                        entity.remove();
+                    }
+                });
                 removed++;
             }
+            it.remove(); // Aus Tracking entfernen
         }
+
         plugin.getLogger().info(lang.getMessage("log.cleanup.snowmen", removed));
+        if (tracked > removed && plugin.isDebugMode()) {
+            plugin.debug("Snowmen: " + removed + " removed, " + (tracked - removed) + " already gone");
+        }
     }
 
     /**
@@ -122,11 +143,8 @@ public class SnowmanManager {
         String worldName = plugin.getConfig().getString("snowWorld", "world");
         if (!w.getName().equals(worldName)) return;
 
-        // Zähle aktuelle Schneemänner (global limit)
-        int current = 0;
-        for (Snowman sm : w.getEntitiesByClass(Snowman.class)) {
-            if (sm.getScoreboardTags().contains(TAG)) current++;
-        }
+        // FOLIA FIX: Zähle tracked Schneemänner (global limit) - thread-safe!
+        int current = trackedSnowmen.size();
         int max = plugin.getConfig().getInt("snowmen.maxPerWorld", 6);
         if (current >= max) return;
 
@@ -142,6 +160,9 @@ public class SnowmanManager {
             sm.setCustomNameVisible(true);
             sm.getScoreboardTags().add(TAG);
             sm.setDerp(false);
+
+            // FOLIA FIX: Track spawned snowman
+            trackedSnowmen.add(sm.getUniqueId());
 
             // FOLIA FIX: Starte Entity Scheduler Task für Attack-Logik
             startEntityAttackTask(sm);
@@ -164,6 +185,7 @@ public class SnowmanManager {
             if (!snowman.isValid() || snowman.isDead()) {
                 WrappedTask oldTask = entityAttackTasks.remove(snowmanId);
                 if (oldTask != null) oldTask.cancel();
+                trackedSnowmen.remove(snowmanId); // Remove from tracking when dead
                 return;
             }
 

@@ -66,6 +66,10 @@ public class BiomeSnowManager {
     private final Set<ChunkKey> processedChunks = ConcurrentHashMap.newKeySet();
     private static final int MAX_PROCESSED_CACHE = 5000; // Max Cache-Größe
 
+    // RETRY MECHANISM: Tracking für nicht-geladene Chunks (versuche sie später nochmal)
+    private final java.util.Map<ChunkKey, Integer> chunkRetryCount = new java.util.concurrent.ConcurrentHashMap<>();
+    private static final int MAX_CHUNK_RETRIES = 3; // Nach 3 Versuchen aufgeben
+
     // ---------- Seed-Ref ----------
     private World refWorld;
 
@@ -82,16 +86,16 @@ public class BiomeSnowManager {
             db = new BiomeSnapshotDatabase(plugin);
             try {
                 db.open();
-                plugin.getLogger().info("Biome-Snapshot Datenbank bereit.");
+                plugin.getLogger().info(plugin.getLanguageManager().get("log.biome.database-ready"));
                 plugin.debug("Datenbank geöffnet: " + db.getDatabaseSize() + " bytes, " + db.getChunkCount() + " chunks");
             } catch (SQLException e) {
-                plugin.getLogger().severe("Fehler beim Öffnen der Snapshot-Datenbank: " + e.getMessage());
-                plugin.getLogger().severe("Snapshot-System deaktiviert! Kein automatisches Restore möglich.");
+                plugin.getLogger().severe(plugin.getLanguageManager().getMessage("log.biome.error-opening-database", e.getMessage()));
+                plugin.getLogger().severe(plugin.getLanguageManager().get("log.biome.snapshot-system-disabled"));
                 e.printStackTrace();
                 db = null;
             }
         } else {
-            plugin.getLogger().info("Biome-Snapshot System deaktiviert (enableSnapshot: false)");
+            plugin.getLogger().info(plugin.getLanguageManager().get("log.biome.system-disabled-config"));
             plugin.debug("enableSnapshot = false in config.yml");
             db = null;
         }
@@ -131,6 +135,7 @@ public class BiomeSnowManager {
         chunkProcessQueue.clear(); // Queue leeren
         processedChunks.clear(); // Cache leeren
         knownSnapshotChunks.clear(); // PERFORMANCE FIX: DB-Lookup-Cache leeren
+        chunkRetryCount.clear(); // RETRY MECHANISM: Retry-Counter leeren
 
         // Datenbank nur schließen wenn gewünscht
         if (closeDatabase && db != null) {
@@ -246,10 +251,10 @@ public class BiomeSnowManager {
     /** Snapshot vollständig und asynchron zurückspielen (für /xmas off) */
     public void restoreALLAsync(int perTick) {
         if (db == null) {
-            plugin.getLogger().warning("§c═══ BIOME RESTORE FEHLER ═══");
-            plugin.getLogger().warning("§cKein Biome-Snapshot vorhanden! Restore nicht möglich.");
-            plugin.getLogger().warning("§cSnapshot-System war deaktiviert oder Datenbank-Fehler.");
-            plugin.getLogger().warning("§7Lösung: Setze 'enableSnapshot: true' in config.yml");
+            plugin.getLogger().warning(plugin.getLanguageManager().get("log.biome.restore-error-header"));
+            plugin.getLogger().warning(plugin.getLanguageManager().get("log.biome.no-snapshot-available"));
+            plugin.getLogger().warning(plugin.getLanguageManager().get("log.biome.snapshot-disabled-or-error"));
+            plugin.getLogger().warning(plugin.getLanguageManager().get("log.biome.solution-enable-snapshot"));
             return;
         }
 
@@ -258,23 +263,24 @@ public class BiomeSnowManager {
         processedChunks.clear();
         knownSnapshotChunks.clear();
         chunkProcessQueue.clear();
+        chunkRetryCount.clear();
 
         try {
             int totalChunks = db.getChunkCount();
-            plugin.getLogger().info("§6═══ BIOME RESTORE START ═══");
-            plugin.getLogger().info("§7Chunks in Datenbank: §f" + totalChunks);
+            plugin.getLogger().info(plugin.getLanguageManager().get("log.biome.restore-start-header"));
+            plugin.getLogger().info(plugin.getLanguageManager().getMessage("log.biome.chunks-in-database", totalChunks));
 
             if (totalChunks == 0) {
-                plugin.getLogger().warning("§cBiome-Snapshot ist leer! Kein Reset möglich.");
-                plugin.getLogger().warning("§7Wurden Chunks gesnapshoted während 'xmas on' aktiv war?");
-                plugin.getLogger().info("§6═══════════════════════════");
+                plugin.getLogger().warning(plugin.getLanguageManager().get("log.biome.snapshot-empty"));
+                plugin.getLogger().warning(plugin.getLanguageManager().get("log.biome.snapshot-timing-question"));
+                plugin.getLogger().info(plugin.getLanguageManager().get("log.biome.separator-line"));
                 return;
             }
 
             // Alle Chunk-Koordinaten aus der Datenbank abrufen
             List<BiomeSnapshotDatabase.ChunkCoords> allChunks = db.getAllChunkCoordinates();
-            plugin.getLogger().info("§aStarte Restore für " + totalChunks + " Chunks...");
-            plugin.getLogger().info("§7Budget: " + Math.max(1, perTick) + " Chunks/Tick");
+            plugin.getLogger().info(plugin.getLanguageManager().getMessage("log.biome.starting-restore", totalChunks));
+            plugin.getLogger().info(plugin.getLanguageManager().getMessage("log.biome.budget", Math.max(1, perTick) + " Chunks/Tick"));
             long startTime = System.currentTimeMillis();
 
             final int budget = Math.max(1, perTick);
@@ -298,7 +304,7 @@ public class BiomeSnowManager {
                             // Hole World
                             World world = Bukkit.getWorld(coords.world);
                             if (world == null) {
-                                plugin.getLogger().warning("Welt nicht gefunden: " + coords.world);
+                                plugin.getLogger().warning(plugin.getLanguageManager().getMessage("log.biome.world-not-found", coords.world));
                                 errors[0]++;
                                 continue;
                             }
@@ -306,7 +312,7 @@ public class BiomeSnowManager {
                             // Lade 3D Biome-Daten aus Datenbank
                             BiomeSnapshotDatabase.BiomeSnapshot3D snapshot = db.loadChunk3D(coords.world, coords.x, coords.z);
                             if (snapshot == null) {
-                                plugin.getLogger().warning("Chunk-Daten nicht in DB: " + coords.x + "," + coords.z);
+                                plugin.getLogger().warning(plugin.getLanguageManager().getMessage("log.biome.chunk-data-not-in-db", coords.x, coords.z));
                                 errors[0]++;
                                 continue;
                             }
@@ -315,96 +321,106 @@ public class BiomeSnowManager {
                             batchSnapshots.add(snapshot);
 
                         } catch (Exception chunkError) {
-                            plugin.getLogger().warning("Fehler bei Chunk " + coords.x + "," + coords.z + ": " + chunkError.getMessage());
+                            plugin.getLogger().warning(plugin.getLanguageManager().getMessage("log.biome.chunk-error", coords.x, coords.z, chunkError.getMessage()));
                             errors[0]++;
                         }
                     }
 
-                    // Verarbeite Batch (nur EINEN Location Scheduler Task statt 'budget' Tasks!)
-                    if (!batchChunks.isEmpty()) {
-                        BiomeSnapshotDatabase.ChunkCoords firstCoord = batchChunks.get(0);
-                        World world = Bukkit.getWorld(firstCoord.world);
+                    // FOLIA FIX: Jeder Chunk muss auf seinem EIGENEN Location Scheduler laufen!
+                    // Batch-System funktioniert NICHT auf Folia (Cross-Region-Zugriff verboten)
+                    for (int i = 0; i < batchChunks.size(); i++) {
+                        BiomeSnapshotDatabase.ChunkCoords coords = batchChunks.get(i);
+                        BiomeSnapshotDatabase.BiomeSnapshot3D snapshot = batchSnapshots.get(i);
+
+                        World world = Bukkit.getWorld(coords.world);
                         if (world != null) {
+                            final int chunkX = coords.x;
+                            final int chunkZ = coords.z;
                             org.bukkit.Location schedulerLoc = new org.bukkit.Location(world,
-                                (firstCoord.x << 4) + 8, 64, (firstCoord.z << 4) + 8);
+                                (chunkX << 4) + 8, 64, (chunkZ << 4) + 8);
 
                             scheduler.runAtLocation(schedulerLoc, () -> {
-                                // Verarbeite alle Chunks im Batch synchron (aber nur 1 Scheduler-Task!)
-                                for (int i = 0; i < batchChunks.size(); i++) {
-                                    BiomeSnapshotDatabase.ChunkCoords coords = batchChunks.get(i);
-                                    BiomeSnapshotDatabase.BiomeSnapshot3D snapshot = batchSnapshots.get(i);
+                                try {
+                                    World finalWorld = Bukkit.getWorld(coords.world);
+                                    if (finalWorld == null) {
+                                        plugin.getLogger().fine("Welt nicht gefunden beim Restore: " + coords.world);
+                                        errors[0]++;
+                                        return;
+                                    }
 
+                                    // ROBUSTNESS FIX: Sichere Chunk-Ladung mit aggressivem Loading
+                                    Chunk chunk = null;
                                     try {
-                                        World finalWorld = Bukkit.getWorld(coords.world);
-                                        if (finalWorld == null) {
-                                            plugin.getLogger().fine("Welt nicht gefunden beim Restore: " + coords.world);
-                                            continue;
-                                        }
+                                        // FOLIA: getChunkAt() ist sicher wenn auf Location Scheduler
+                                        chunk = finalWorld.getChunkAt(chunkX, chunkZ);
 
-                                        int chunkX = coords.x;
-                                        int chunkZ = coords.z;
-
-                                        // ROBUSTNESS FIX: Sichere Chunk-Ladung
-                                        Chunk chunk = null;
-                                        try {
-                                            chunk = finalWorld.getChunkAt(chunkX, chunkZ);
-                                            if (!chunk.isLoaded()) {
-                                                boolean loaded = finalWorld.loadChunk(chunkX, chunkZ, false);
-                                                if (!loaded) {
-                                                    plugin.getLogger().fine("Chunk konnte nicht geladen werden: " + chunkX + "," + chunkZ);
-                                                    continue;
-                                                }
-                                                chunk = finalWorld.getChunkAt(chunkX, chunkZ);
-                                            }
-                                        } catch (Exception e) {
-                                            plugin.getLogger().warning("Fehler beim Laden von Chunk " + chunkX + "," + chunkZ + ": " + e.getMessage());
-                                            continue;
-                                        }
-
-                                        if (chunk != null && chunk.isLoaded()) {
-                                            boolean success = false;
-                                            try {
-                                                // Biomes wiederherstellen (3D!)
-                                                restoreChunkBiomes3D(finalWorld, chunk, snapshot);
-
-                                                // Schnee und Eis entfernen
-                                                removeWinterBlocks3D(finalWorld, chunk, snapshot);
-
-                                                // Chunk refreshen für Client-Update
-                                                refreshChunkSafe(finalWorld, chunk);
-
-                                                restored[0]++;
-                                                success = true;
-                                            } catch (Exception e) {
-                                                plugin.getLogger().warning("Fehler beim Restore von Chunk " + chunkX + "," + chunkZ + ": " + e.getMessage());
-                                                if (plugin.isDebugMode()) e.printStackTrace();
+                                        // Falls nicht geladen: FORCE load (generate=false)
+                                        if (!chunk.isLoaded()) {
+                                            // loadChunk() ist synchron und blockiert bis Chunk geladen
+                                            boolean loaded = finalWorld.loadChunk(chunkX, chunkZ, true);
+                                            if (!loaded) {
+                                                plugin.getLogger().warning(plugin.getLanguageManager().getMessage("log.biome.chunk-not-loaded-db", chunkX, chunkZ));
                                                 errors[0]++;
+                                                return;
                                             }
+                                            chunk = finalWorld.getChunkAt(chunkX, chunkZ);
+                                        }
 
-                                            // CRITICAL FIX: Nur aus DB löschen wenn ERFOLGREICH restored!
-                                            // Sonst bleiben Chunk-Streifen permanent (werden nie wieder versucht)!
-                                            if (success) {
-                                                final BiomeSnapshotDatabase database = db;
-                                                if (database != null) {
-                                                    try {
-                                                        database.deleteChunk(coords.world, chunkX, chunkZ);
-                                                    } catch (SQLException e) {
-                                                        plugin.getLogger().fine("Fehler beim Löschen von Chunk aus DB: " + e.getMessage());
-                                                    }
-                                                }
-                                            } else {
-                                                plugin.getLogger().warning("Chunk " + chunkX + "," + chunkZ + " wurde NICHT restored - bleibt in DB für nächsten Versuch!");
-                                            }
-                                        } else {
-                                            // Chunk konnte nicht geladen werden - bleibt in DB für nächsten Versuch
-                                            plugin.getLogger().warning("Chunk " + chunkX + "," + chunkZ + " nicht geladen - bleibt in DB für nächsten Versuch!");
+                                        // Doppelcheck: Ist Chunk jetzt wirklich geladen?
+                                        if (chunk == null || !chunk.isLoaded()) {
+                                            plugin.getLogger().warning(plugin.getLanguageManager().getMessage("log.biome.chunk-not-loaded-db", chunkX, chunkZ));
+                                            errors[0]++;
+                                            return;
+                                        }
+                                    } catch (Exception e) {
+                                        plugin.getLogger().warning(plugin.getLanguageManager().getMessage("log.biome.error-loading-chunk", chunkX, chunkZ, e.getMessage()));
+                                        errors[0]++;
+                                        return;
+                                    }
+
+                                    if (chunk != null && chunk.isLoaded()) {
+                                        boolean success = false;
+                                        try {
+                                            // Biomes wiederherstellen (3D!)
+                                            restoreChunkBiomes3D(finalWorld, chunk, snapshot);
+
+                                            // Schnee und Eis entfernen
+                                            removeWinterBlocks3D(finalWorld, chunk, snapshot);
+
+                                            // Chunk refreshen für Client-Update
+                                            refreshChunkSafe(finalWorld, chunk);
+
+                                            restored[0]++;
+                                            success = true;
+                                        } catch (Exception e) {
+                                            plugin.getLogger().warning(plugin.getLanguageManager().getMessage("log.biome.error-restoring-chunk", chunkX, chunkZ, e.getMessage()));
+                                            if (plugin.isDebugMode()) e.printStackTrace();
                                             errors[0]++;
                                         }
 
-                                    } catch (Exception e) {
-                                        plugin.getLogger().warning("Kritischer Fehler beim Restore von Chunk: " + e.getMessage());
-                                        if (plugin.isDebugMode()) e.printStackTrace();
+                                        // CRITICAL FIX: Nur aus DB löschen wenn ERFOLGREICH restored!
+                                        // Sonst bleiben Chunk-Streifen permanent (werden nie wieder versucht)!
+                                        if (success) {
+                                            final BiomeSnapshotDatabase database = db;
+                                            if (database != null) {
+                                                try {
+                                                    database.deleteChunk(coords.world, chunkX, chunkZ);
+                                                } catch (SQLException e) {
+                                                    plugin.getLogger().fine(plugin.getLanguageManager().getMessage("log.database.delete-chunk-error", e.getMessage()));
+                                                }
+                                            }
+                                        } else {
+                                            plugin.getLogger().warning(plugin.getLanguageManager().getMessage("log.biome.chunk-not-restored", chunkX, chunkZ));
+                                        }
+                                    } else {
+                                        // Chunk konnte nicht geladen werden - bleibt in DB für nächsten Versuch
+                                        plugin.getLogger().warning(plugin.getLanguageManager().getMessage("log.biome.chunk-not-loaded-db", chunkX, chunkZ));
+                                        errors[0]++;
                                     }
+
+                                } catch (Exception e) {
+                                    plugin.getLogger().warning(plugin.getLanguageManager().getMessage("log.biome.critical-restore-error", e.getMessage()));
+                                    if (plugin.isDebugMode()) e.printStackTrace();
                                 }
                             });
                         }
@@ -412,26 +428,27 @@ public class BiomeSnowManager {
 
                     // Fortschritt alle 50 Chunks loggen
                     if (processed[0] % 50 == 0 && processed[0] < totalChunks) {
-                        plugin.getLogger().info("§7Biome-Reset: §f" + processed[0] + "/" + totalChunks +
-                                               " §7(Restored: §a" + restored[0] + "§7, Fehler: §c" + errors[0] + "§7)");
+                        plugin.getLogger().info(plugin.getLanguageManager().getMessage("log.biome.restore-progress",
+                                               processed[0], totalChunks, restored[0], errors[0]));
                     }
 
                     if (processed[0] >= totalChunks) {
                         long duration = System.currentTimeMillis() - startTime;
-                        plugin.getLogger().info("§a═══ BIOME RESTORE FERTIG ═══");
-                        plugin.getLogger().info("§7Verarbeitet: §f" + totalChunks + " Chunks");
-                        plugin.getLogger().info("§7Wiederhergestellt: §a" + restored[0] + " Chunks");
+                        plugin.getLogger().info(plugin.getLanguageManager().get("log.biome.restore-complete-header"));
+                        plugin.getLogger().info(plugin.getLanguageManager().getMessage("log.biome.processed", totalChunks));
+                        plugin.getLogger().info(plugin.getLanguageManager().getMessage("log.biome.restored-count", restored[0]));
                         if (errors[0] > 0) {
-                            plugin.getLogger().info("§7Fehler: §c" + errors[0] + " Chunks");
+                            plugin.getLogger().info(plugin.getLanguageManager().getMessage("log.biome.error-count", errors[0]));
                         }
-                        plugin.getLogger().info("§7Dauer: §f" + (duration / 1000.0) + "s");
-                        plugin.getLogger().info("§a════════════════════════════");
+                        plugin.getLogger().info(plugin.getLanguageManager().getMessage("log.biome.duration", (duration / 1000.0)));
+                        plugin.getLogger().info(plugin.getLanguageManager().get("log.biome.separator-footer"));
 
                         // WICHTIG: Leere ALLE Caches nach Restore!
                         plugin.debug("Leere alle Caches nach Restore...");
                         processedChunks.clear();
                         knownSnapshotChunks.clear();
                         chunkProcessQueue.clear();
+                        chunkRetryCount.clear();
 
                         // Leere und schließe Datenbank nach erfolgreichem Restore
                         try {
@@ -440,15 +457,14 @@ public class BiomeSnowManager {
                             plugin.debug("Datenbank geleert und geschlossen nach Restore");
                             db = null;
                         } catch (Exception e) {
-                            plugin.getLogger().warning("Fehler beim Leeren/Schließen der DB: " + e.getMessage());
+                            plugin.getLogger().warning(plugin.getLanguageManager().getMessage("log.biome.error-clearing-db", e.getMessage()));
                         }
                         if (restoreTask[0] != null) {
                             restoreTask[0].cancel();
                         }
                     }
                 } catch (Exception e) {
-                    plugin.getLogger().severe("§cFATALER FEHLER beim Biome-Reset:");
-                    plugin.getLogger().severe("§c" + e.getMessage());
+                    plugin.getLogger().severe(plugin.getLanguageManager().getMessage("log.biome.fatal-error", e.getMessage()));
                     e.printStackTrace();
                     if (restoreTask[0] != null) {
                         restoreTask[0].cancel();
@@ -457,7 +473,7 @@ public class BiomeSnowManager {
             }, 1L, 1L);
 
         } catch (SQLException e) {
-            plugin.getLogger().severe("§cFehler beim Abrufen der Chunk-Daten: " + e.getMessage());
+            plugin.getLogger().severe(plugin.getLanguageManager().getMessage("log.biome.error-retrieving-data", e.getMessage()));
             e.printStackTrace();
         }
     }
@@ -570,9 +586,9 @@ public class BiomeSnowManager {
         if (db != null) {
             try {
                 db.clearAll();
-                plugin.getLogger().info("Biome-Snapshot gelöscht.");
+                plugin.getLogger().info(plugin.getLanguageManager().get("log.biome.snapshot-deleted"));
             } catch (SQLException e) {
-                plugin.getLogger().severe("Fehler beim Löschen des Snapshots: " + e.getMessage());
+                plugin.getLogger().severe(plugin.getLanguageManager().getMessage("log.biome.error-deleting-snapshot", e.getMessage()));
             }
         }
     }
@@ -599,16 +615,23 @@ public class BiomeSnowManager {
 
     /**
      * FOLIA: Chunks mit Location Scheduler verarbeiten (parallel über Regionen)
+     * PERFORMANCE: Respektiert perTickBudget um TPS-Spikes zu vermeiden!
      */
     private void ensureAroundPlayerFolia(Player p, World w) {
         int r = Math.max(0, plugin.getConfig().getInt("biome.playerBubble.radiusChunks", 3));
+        int budget = Math.max(1, plugin.getConfig().getInt("biome.playerBubble.perTickBudget", 12));
         org.bukkit.Location loc = p.getLocation();
         int baseCX = loc.getBlockX() >> 4;
         int baseCZ = loc.getBlockZ() >> 4;
 
+        int scheduled = 0;
+
         // Jeder Chunk separat auf Location Scheduler (parallele Verarbeitung)
+        // ABER: Nur maximal 'budget' Chunks pro Aufruf!
         for (int dx = -r; dx <= r; dx++) {
             for (int dz = -r; dz <= r; dz++) {
+                if (scheduled >= budget) return; // Budget erreicht - fertig für diesen Tick!
+
                 final int chunkX = baseCX + dx;
                 final int chunkZ = baseCZ + dz;
                 ChunkKey key = new ChunkKey(w.getName(), chunkX, chunkZ);
@@ -619,6 +642,7 @@ public class BiomeSnowManager {
                     scheduler.runAtLocation(chunkLoc, () -> {
                         processChunkAt(w, chunkX, chunkZ);
                     });
+                    scheduled++;
                 }
             }
         }
@@ -695,16 +719,31 @@ public class BiomeSnowManager {
         // Lade Chunk falls nötig (nur im richtigen Scheduler-Kontext!)
         Chunk chunk = w.getChunkAt(chunkX, chunkZ);
         if (!chunk.isLoaded()) {
-            return; // Chunk nicht geladen - überspringe
+            // RETRY MECHANISM: Tracke nicht-geladene Chunks und versuche sie später nochmal
+            int retries = chunkRetryCount.getOrDefault(key, 0);
+            retries++;
+            chunkRetryCount.put(key, retries);
+
+            if (retries >= MAX_CHUNK_RETRIES) {
+                // Nach MAX_CHUNK_RETRIES Versuchen: Als "verarbeitet" markieren (aufgeben)
+                processedChunks.add(key);
+                chunkRetryCount.remove(key); // Cleanup
+                plugin.verboseDebug("Chunk " + chunkX + "," + chunkZ + " nach " + retries + " Versuchen übersprungen (nicht geladen)");
+            }
+            // Sonst: Chunk NICHT zum processedChunks hinzufügen → wird beim nächsten Mal nochmal versucht!
+            return;
         }
 
+        // Chunk ist geladen - verarbeite ihn!
         Biome target = getTargetBiome();
         snapshotIfAbsent(w, chunk);
         if (applyUniformBiomeColumn(w, chunk, target)) {
             refreshChunkSafe(w, chunk);
         }
 
+        // ERFOLG: Als verarbeitet markieren und Retry-Counter entfernen
         processedChunks.add(key);
+        chunkRetryCount.remove(key);
 
         // Begrenze Cache-Größe
         if (processedChunks.size() > MAX_PROCESSED_CACHE) {
@@ -717,6 +756,12 @@ public class BiomeSnowManager {
                 it.remove();
                 removed++;
             }
+        }
+
+        // RETRY MECHANISM: Begrenze Retry-Counter-Map Größe (vermeide Memory Leak)
+        if (chunkRetryCount.size() > 1000) {
+            // Entferne Chunks die sehr viele Retries haben (wahrscheinlich nie laden werden)
+            chunkRetryCount.entrySet().removeIf(entry -> entry.getValue() >= MAX_CHUNK_RETRIES);
         }
     }
 
@@ -900,7 +945,7 @@ public class BiomeSnowManager {
             plugin.verboseDebugLang("log.debug.snapshot.saved", key.x, key.z, yLayers);
 
         } catch (SQLException e) {
-            plugin.getLogger().warning("Fehler beim Speichern von Chunk-Snapshot: " + e.getMessage());
+            plugin.getLogger().warning(plugin.getLanguageManager().getMessage("log.biome.error-saving-snapshot", e.getMessage()));
             if (plugin.isDebugMode()) e.printStackTrace();
         }
     }
@@ -957,7 +1002,7 @@ public class BiomeSnowManager {
 
     private void refreshChunkSafe(World w, Chunk c) {
         // PERFORMANCE FIX: Nur refreshen wenn in Config aktiviert
-        if (!plugin.getConfig().getBoolean("biome.playerBubble.refreshClient", false)) {
+        if (!plugin.getConfig().getBoolean("biome.playerBubble.refreshClient", true)) {
             return; // Client-Refresh deaktiviert - Spieler sehen Updates beim Relog
         }
 
@@ -1089,10 +1134,11 @@ public class BiomeSnowManager {
                 final int chunkX = baseCX + dx;
                 final int chunkZ = baseCZ + dz;
 
-                // CRITICAL: Sofort zu Cache hinzufügen!
+                // CRITICAL: Sofort zu Cache hinzufügen um Race Condition zu vermeiden
                 ChunkKey key = new ChunkKey(w.getName(), chunkX, chunkZ);
                 processedChunks.add(key);
-                knownSnapshotChunks.add(key);
+                // BUGFIX: knownSnapshotChunks NICHT hier hinzufügen!
+                // snapshotIfAbsent() muss prüfen können ob Snapshot existiert!
             }
         }
 

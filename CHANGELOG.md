@@ -2,6 +2,120 @@
 
 All notable changes to the ChristmasSeason plugin will be documented in this file.
 
+## [2.1.0] - 2025-12-25
+
+**Minor Update:** Critical Folia compatibility fixes and complete internationalization overhaul.
+
+This release fixes multiple critical thread-safety violations on Folia servers and completes the internationalization system. The biome restore mechanism has been completely rewritten to work correctly with Folia's regionalized threading model.
+
+**Upgrade Priority:** HIGH - Recommended for all Folia servers experiencing crashes during `/xmas off`
+
+### Fixed
+- **CRITICAL: Folia performance issue - TPS drops to 16 during biome changes**
+  - Fixed `ensureAroundPlayerFolia()` scheduling all chunks around player simultaneously
+  - **Root cause**: With radius=2, all 25 chunks were scheduled in parallel every tick (no budget limit)
+  - **Result**: Massive TPS spike when processing 25 chunks × 9,728 biomes each = 240k+ biome changes
+  - **Solution**: Added `perTickBudget` respect - only schedules max 12 chunks per player tick
+  - Chunks now distributed across multiple ticks (e.g., 25 chunks over 3 ticks instead of instant)
+  - Performance now matches Paper/Spigot budget-based system
+
+- **Client-side biome caching after `/xmas off`**
+  - Fixed default value for `biome.playerBubble.refreshClient` from `false` to `true`
+  - Clients now correctly see restored biomes without needing to move away and return
+  - Chunk refresh packets now sent by default (can be disabled in config for performance)
+
+- **CRITICAL: Biome snapshot bug in `/xmas biome set` command**
+  - Fixed chunks not being restored correctly after manual biome changes
+  - **Root cause**: `setBiomeAroundPlayer()` added chunks to `knownSnapshotChunks` cache BEFORE calling `snapshotIfAbsent()`
+  - **Result**: No snapshot was created for manually changed chunks → wrong biome restored on `/xmas off`
+  - **Solution**: Removed premature cache addition, let `snapshotIfAbsent()` manage the cache correctly
+  - Fixes issue where chunks changed with `/xmas biome set` were not restored to original biomes
+
+- **CRITICAL: Chunks not loaded during `/xmas on` were never processed**
+  - Implemented automatic retry mechanism for chunks that fail to load
+  - Chunks are now retried up to 3 times before being skipped
+  - Prevents "missing chunks" issue where distant/unloaded chunks stay unchanged
+  - Added `chunkRetryCount` tracking map with automatic cleanup to prevent memory leaks
+  - Debug logging for chunks that are skipped after max retries
+
+- **CRITICAL: Complete internationalization of all console logs**
+  - Fixed English language module not being loaded correctly from JAR
+  - Replaced ALL 68 hardcoded German strings with LanguageManager calls:
+    - **BiomeSnapshotDatabase.java**: 34 strings replaced
+    - **BiomeSnowManager.java**: 33 strings replaced
+    - **SnowmanManager.java**: 1 string replaced
+  - All console log messages now properly respect the `language` setting in config.yml
+  - Verified: Zero hardcoded German strings remaining in user-facing logs
+
+- **CRITICAL: Folia thread safety violations in biome restore**
+  - Fixed `IllegalStateException` crash during `/xmas off` biome restoration on Folia servers
+  - **Root cause**: Batch processing accessed chunks from different regions in single Location Scheduler task
+  - **Error**: "Thread failed main thread check: Async chunk retrieval"
+  - **Solution**: Each chunk now processed on its own Location Scheduler task (prevents cross-region access)
+  - Removed batch optimization that violated Folia's region threading model
+  - Improved chunk loading: Now uses blocking load (`generate=true`) for higher success rate
+  - Added double-check verification to ensure chunks are actually loaded before restore
+  - Fixed error counting to accurately track failed chunk restores
+
+- **CRITICAL: Folia thread safety violations in cleanup methods**
+  - Fixed `IllegalStateException` crash when running `/xmas off` on Folia servers
+  - **Root cause**: Using `world.getEntitiesByClass()` and direct `entity.remove()` calls access entities from other regions, violating Folia's thread ownership model
+  - **DecorationManager.java**: Replaced unsafe entity iteration with UUID tracking
+    - Added `trackedDecorations` ConcurrentHashMap for thread-safe entity tracking
+    - Track decorations when spawned, untrack when lifetime expires
+    - cleanup() now uses `Bukkit.getEntity(uuid)` + `scheduler.runForEntity()` pattern
+  - **SnowmanManager.java**: Replaced unsafe entity iteration and counting
+    - Added `trackedSnowmen` ConcurrentHashMap for thread-safe entity tracking
+    - Replaced `getEntitiesByClass()` loop with `trackedSnowmen.size()` for counting
+    - cleanup() now schedules removal on each entity's owning region thread
+    - Properly cancels attack tasks before entity removal
+  - **WichtelManager.java**: Fixed direct entity.remove() calls in cleanup()
+    - cleanup() now schedules Wichtel/Elfen removal on each entity's owning region thread
+    - Properly cancels steal tasks before entity removal
+    - Uses same UUID tracking + entity scheduler pattern
+  - All entity removals now scheduled on correct region threads (Folia-safe)
+  - **GiftManager**: Already Folia-safe (uses Location Scheduler for block operations)
+
+### Changed
+- **Enhanced Language Files**
+  - Added 70+ new translation keys to `messages_de.yml`:
+    - `log.biome.*` - 35+ keys for biome restore operations, errors, and status
+    - `log.database.*` - 35+ keys for database operations, compression, errors
+    - `log.cleanup.snowman-world-not-found` - Snowman cleanup error
+  - Added matching English translations to `messages_en.yml`
+  - All formatting codes (§6, §7, §a, §c, §f, etc.) preserved in translations
+
+- **Improved Translation Coverage**
+  - Database operations (open, close, clear, compression, decompression)
+  - Biome restore operations (start, progress, completion, errors)
+  - Error messages and warnings with detailed context
+  - Statistics and progress information
+  - Chunk loading/restoration errors with coordinates
+
+- **Improved Language Loading Diagnostics**
+  - `LanguageManager` now logs:
+    - Current language being loaded
+    - Absolute file path of language file
+    - File existence status and size in bytes
+    - Source of language data (disk vs JAR)
+    - Number of keys loaded successfully
+  - Better error messages when resources are missing from JAR
+  - Added resource enumeration in severe error cases for debugging
+
+- **Build Configuration**
+  - Added explicit Maven resources configuration in `pom.xml`
+  - Ensures all `.yml` and `.yaml` files are properly packaged in JAR
+  - Language files (`messages_de.yml`, `messages_en.yml`) now correctly included
+
+### Technical
+- All log messages now use `plugin.getLanguageManager().getMessage()` or `.get()`
+- Proper placeholder support with {0}, {1}, {2} format for dynamic values
+- Technical/internal logs (resource loading, language manager) intentionally kept in English
+- Updated `pom.xml` with explicit `<resources>` section
+- Added better exception handling in `ChristmasSeason.saveResourceIfAbsent()`
+- Enhanced logging shows resource extraction status with file sizes
+- Maintains backward compatibility with existing configurations
+
 ## [2.0.0] - 2025-12-19
 
 ### Added
