@@ -1,4 +1,4 @@
-# ChristmasSeason v2.0 🎄
+# ChristmasSeason v2.1 🎄
 
 **Transform your Minecraft world into a winter wonderland!**
 
@@ -52,7 +52,7 @@ A comprehensive Christmas plugin featuring biome snowfall, snowstorms, NPCs, gif
 
 ## 📦 Installation
 
-1. **Download:** Get `ChristmasSeason-2.0.0.jar`
+1. **Download:** Get `ChristmasSeason-2.1.0.jar`
 2. **Installation:** Copy the JAR to the `plugins/` folder
 3. **Server Start:** Start your server (Spigot/Paper/Purpur/Folia)
 4. **Configuration:** Adjust `config.yml` (optional)
@@ -194,11 +194,15 @@ snowmen:
 
 ### Problem: `NoSuchMethodError: teleportAsync` (Spigot)
 **Cause:** Old plugin version before v2.0.0
-**Solution:** Update to ChristmasSeason v2.0.0+ (Multi-Platform Support)
+**Solution:** Update to ChristmasSeason v2.1.0+ (Multi-Platform Support)
 
 ### Problem: `UnsupportedOperationException: Must use teleportAsync` (Folia)
 **Cause:** Old plugin version before v2.0.0
-**Solution:** Update to ChristmasSeason v2.0.0+ (Multi-Platform Support)
+**Solution:** Update to ChristmasSeason v2.1.0+ (Multi-Platform Support)
+
+### Problem: `IllegalStateException` crashes during `/xmas off` on Folia
+**Cause:** Thread safety violations in old versions
+**Solution:** Update to ChristmasSeason v2.1.0+ (Critical Folia fixes included)
 
 ### Problem: TPS drops on Paper
 **Solution:** Reduce `perTickBudget` to 6 or increase `tickIntervalTicks` to 60
@@ -220,12 +224,29 @@ snowmen:
 
 ---
 
-## 🔄 Migration from v1.4.1
+## 🔄 Migration Guide
 
-**Good news:** Version 2.0 is fully compatible!
+### From v2.0.0 to v2.1.0
+
+**Recommended for all Folia servers!** This update fixes critical thread-safety issues.
 
 1. **Stop the server**
-2. **Replace the old JAR** with `ChristmasSeason-2.0.0.jar`
+2. **Replace the JAR** with `ChristmasSeason-2.1.0.jar`
+3. **Start the server** - done!
+
+**Changes:**
+- ✅ Config remains identical
+- ✅ Database fully compatible
+- ✅ Critical Folia fixes (no more crashes during `/xmas off`)
+- ✅ Complete internationalization (all logs respect `language` setting)
+- ✅ Fixed TPS drops on Folia with `perTickBudget` enforcement
+
+### From v1.4.1
+
+**Good news:** Version 2.1 is fully compatible!
+
+1. **Stop the server**
+2. **Replace the old JAR** with `ChristmasSeason-2.1.0.jar`
 3. **Start the server** - done!
 
 **Changes:**
@@ -239,6 +260,14 @@ snowmen:
 ## 📝 Changelog
 
 See [CHANGELOG.md](CHANGELOG.md) for detailed version history.
+
+**v2.1.0 Highlights:**
+- 🔥 **CRITICAL:** Fixed Folia crashes during `/xmas off` (thread-safety violations)
+- 🔥 **CRITICAL:** Fixed TPS drops to 16 on Folia (proper `perTickBudget` enforcement)
+- 🔥 **CRITICAL:** Fixed `/xmas biome set` not creating snapshots correctly
+- 🌐 Complete internationalization (all 68+ log messages now respect `language` setting)
+- 🔄 Automatic chunk retry mechanism (fixes "missing chunks" issue)
+- ✅ Fixed client-side biome caching after `/xmas off`
 
 **v2.0.0 Highlights:**
 - 🎄 Multi-Platform Support (Spigot/Paper/Purpur/Folia)
