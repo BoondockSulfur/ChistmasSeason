@@ -152,8 +152,15 @@ public class SnowmanManager {
         Location playerLoc = player.getLocation();
 
         scheduler.runAtLocation(playerLoc, () -> {
-            // Safe-Spawn: 5 Versuche (Performance-optimiert, strenge Wasser/Wand-Checks)
-            Location loc = SpawnUtil.findSafeSpawnLocation(w, playerLoc, 10, 5);
+            // Safe-Spawn: 5 Versuche mit STRENGEM Wasser-Check (noWater=true für Schneemänner!)
+            // Schneemänner dürfen NICHT in Wasser spawnen (schmelzen sofort)
+            Location loc = SpawnUtil.findSafeSpawnLocation(w, playerLoc, 10, 5, true);
+
+            // Region-Schutz: Kein Spawn in geschützten Bereichen
+            if (plugin.getRegionIntegration() != null && !plugin.getRegionIntegration().canSpawnAt(loc)) {
+                plugin.debug("Snowman spawn blocked by region protection at " + loc.getBlockX() + "," + loc.getBlockZ());
+                return;
+            }
 
             Snowman sm = w.spawn(loc, Snowman.class);
             sm.setCustomName(lang.get("entity.snowman"));

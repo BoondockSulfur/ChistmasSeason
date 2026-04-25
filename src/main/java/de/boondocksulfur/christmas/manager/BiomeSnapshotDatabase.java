@@ -31,6 +31,15 @@ public class BiomeSnapshotDatabase {
     }
 
     /**
+     * Konstruktor für custom DB-Datei (z.B. Backup)
+     * Wird von BiomeCompare verwendet zum Lesen von Backup-Dateien
+     */
+    public BiomeSnapshotDatabase(ChristmasSeason plugin, File customDbFile) {
+        this.plugin = plugin;
+        this.dbFile = customDbFile;
+    }
+
+    /**
      * Öffnet die Datenbankverbindung und erstellt die Tabelle falls nötig
      */
     public void open() throws SQLException {
@@ -80,7 +89,8 @@ public class BiomeSnapshotDatabase {
      * Speichert einen 3D Chunk-Snapshot (komprimiert)
      * Format: [Magic 0x3D] [yLayers] [yStart] [yStep] [biomes...]
      */
-    public void saveChunk3D(String world, int x, int z, Biome[][][] biomes3D, int yStart, int yStep) throws SQLException {
+    // FIX: synchronized auf allen DB-Methoden für Thread-Safety (Folia Region Threads)
+    public synchronized void saveChunk3D(String world, int x, int z, Biome[][][] biomes3D, int yStart, int yStep) throws SQLException {
         if (biomes3D == null || biomes3D.length == 0) {
             throw new IllegalArgumentException("biomes3D cannot be null or empty");
         }
@@ -130,7 +140,7 @@ public class BiomeSnapshotDatabase {
      *
      * @return BiomeSnapshot3D oder null wenn nicht gefunden
      */
-    public BiomeSnapshot3D loadChunk3D(String world, int x, int z) throws SQLException {
+    public synchronized BiomeSnapshot3D loadChunk3D(String world, int x, int z) throws SQLException {
         String sql = "SELECT biomes FROM chunks WHERE world = ? AND x = ? AND z = ?";
 
         try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
@@ -152,7 +162,7 @@ public class BiomeSnapshotDatabase {
     /**
      * Prüft ob ein Chunk im Snapshot existiert
      */
-    public boolean hasChunk(String world, int x, int z) throws SQLException {
+    public synchronized boolean hasChunk(String world, int x, int z) throws SQLException {
         String sql = "SELECT 1 FROM chunks WHERE world = ? AND x = ? AND z = ? LIMIT 1";
 
         try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
@@ -169,7 +179,7 @@ public class BiomeSnapshotDatabase {
     /**
      * Löscht einen Chunk aus dem Snapshot
      */
-    public void deleteChunk(String world, int x, int z) throws SQLException {
+    public synchronized void deleteChunk(String world, int x, int z) throws SQLException {
         String sql = "DELETE FROM chunks WHERE world = ? AND x = ? AND z = ?";
 
         try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
@@ -183,7 +193,7 @@ public class BiomeSnapshotDatabase {
     /**
      * Gibt die Anzahl gespeicherter Chunks zurück
      */
-    public int getChunkCount() throws SQLException {
+    public synchronized int getChunkCount() throws SQLException {
         String sql = "SELECT COUNT(*) FROM chunks";
 
         try (Statement stmt = connection.createStatement();
@@ -206,7 +216,7 @@ public class BiomeSnapshotDatabase {
     /**
      * Löscht alle Snapshots
      */
-    public void clearAll() throws SQLException {
+    public synchronized void clearAll() throws SQLException {
         String sql = "DELETE FROM chunks";
 
         try (Statement stmt = connection.createStatement()) {
@@ -224,7 +234,7 @@ public class BiomeSnapshotDatabase {
     /**
      * Schließt die Datenbankverbindung
      */
-    public void close() {
+    public synchronized void close() {
         if (connection != null) {
             try {
                 connection.close();
@@ -405,17 +415,20 @@ public class BiomeSnapshotDatabase {
 
             boolean isNameBased = (magic == 0x3E);
 
-            // Header lesen
+            // Header lesen (FIX: EOF-Prüfung um OutOfMemoryError bei korrupten Daten zu verhindern)
             int yLayersHi = gzip.read();
             int yLayersLo = gzip.read();
-            int yLayers = (yLayersHi << 8) | yLayersLo;
-
             int yStartHi = gzip.read();
             int yStartLo = gzip.read();
+            int yStep = gzip.read();
+
+            if (yLayersHi == -1 || yLayersLo == -1 || yStartHi == -1 || yStartLo == -1 || yStep == -1) {
+                throw new RuntimeException("Corrupt 3D biome snapshot - unexpected EOF in header");
+            }
+
+            int yLayers = (yLayersHi << 8) | yLayersLo;
             short yStartShort = (short) ((yStartHi << 8) | yStartLo);
             int yStart = yStartShort;
-
-            int yStep = gzip.read();
 
             plugin.debug("3D-Snapshot: yLayers=" + yLayers + ", yStart=" + yStart + ", yStep=" + yStep + ", format=" + (isNameBased ? "Namen" : "Ordinals"));
 
@@ -551,7 +564,7 @@ public class BiomeSnapshotDatabase {
     /**
      * Gibt alle Chunk-Koordinaten aus der Datenbank zurück
      */
-    public java.util.List<ChunkCoords> getAllChunkCoordinates() throws SQLException {
+    public synchronized java.util.List<ChunkCoords> getAllChunkCoordinates() throws SQLException {
         String sql = "SELECT world, x, z FROM chunks";
         java.util.List<ChunkCoords> result = new java.util.ArrayList<>();
 

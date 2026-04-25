@@ -7,8 +7,8 @@ import java.io.File;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
-import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Verwaltet mehrsprachige Nachrichten für das Plugin
@@ -17,7 +17,8 @@ public class LanguageManager {
 
     private final ChristmasSeason plugin;
     private YamlConfiguration messages;
-    private final Map<String, String> cache = new HashMap<>();
+    // FIX: ConcurrentHashMap für thread-safe Zugriff aus async Tasks
+    private final Map<String, String> cache = new ConcurrentHashMap<>();
     private String currentLanguage;
 
     public LanguageManager(ChristmasSeason plugin) {

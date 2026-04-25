@@ -1,8 +1,10 @@
-# ChristmasSeason v2.1 🎄
+# ChristmasSeason v2.2 🎄
 
 **Transform your Minecraft world into a winter wonderland!**
 
 A comprehensive Christmas plugin featuring biome snowfall, snowstorms, NPCs, gifts, and much more. Now with **Multi-Platform Support** for Spigot, Paper, Purpur, **and Folia**!
+
+**NEW in v2.2:** WorldGuard & GriefPrevention Support, Backup System, Update Notifications, Tab Completion, bStats, and 17 Bug Fixes!
 
 ---
 
@@ -27,11 +29,33 @@ A comprehensive Christmas plugin featuring biome snowfall, snowstorms, NPCs, gif
 - **Elves:** Friendly NPCs that wander around
 - **Snowmen:** Aggressive snow golems that throw snowballs
 
+### 🛡️ Region Protection (NEW in v2.2!)
+- **WorldGuard Support:** No spawns in protected regions
+- **GriefPrevention Support:** No spawns in player claims
+- **Soft Dependency:** Works with or without protection plugins
+- **Configurable:** Allow/deny per plugin, admin claims toggle
+- **All entities affected:** Gifts, Wichtel, Elves, Snowmen, Decorations
+
 ### 🔧 Performance Features
 - **SQLite Snapshots:** Compressed biome storage (~5-10 MB instead of 156 MB)
 - **Unlimited Chunks:** No more 2000-chunk limit
 - **Budget System:** Max chunks per tick configurable (`perTickBudget`)
 - **Multi-Threading Ready:** Folia support with regionalized threading
+
+### 💾 Backup & Safety (NEW in v2.2!)
+- **Automatic Backups:** SAFE-Backup before `/xmas on`, Timestamp-Backup after `/xmas off`
+- **Emergency Protection:** Backup created if server stops during active event
+- **Backup Rotation:** Keeps last 5 backups, stored outside plugins folder
+- **Biome Comparison:** Compare current world with any backup to find differences
+- **Smart Recovery:** Restore only changed chunks from backup
+- **Survives Plugin Deletion:** Backups stored in `world/christmas_backups/`
+
+### 🔔 Update System (NEW in v2.2!)
+- **Automatic Checks:** Updates checked on server start via Modrinth API
+- **OP Notifications:** Admins get notified on join about new versions
+- **Manual Checks:** `/xmas update check` for on-demand updates
+- **Smart Versioning:** Semantic version comparison (2.1.0 vs 2.2.0)
+- **Multiple Sources:** Modrinth primary, GitHub Releases fallback
 
 ---
 
@@ -52,7 +76,7 @@ A comprehensive Christmas plugin featuring biome snowfall, snowstorms, NPCs, gif
 
 ## 📦 Installation
 
-1. **Download:** Get `ChristmasSeason-2.1.0.jar`
+1. **Download:** Get `ChristmasSeason-2.2.0.jar` from [Releases](https://github.com/BoondockSulfur/ChristmasSeason/releases)
 2. **Installation:** Copy the JAR to the `plugins/` folder
 3. **Server Start:** Start your server (Spigot/Paper/Purpur/Folia)
 4. **Configuration:** Adjust `config.yml` (optional)
@@ -63,24 +87,66 @@ A comprehensive Christmas plugin featuring biome snowfall, snowstorms, NPCs, gif
 - Java 21+
 - Spigot/Paper/Purpur/Folia Server
 
+**Optional (Soft Dependencies):**
+- WorldGuard 7.0+ (region protection)
+- GriefPrevention (claim protection)
+
+**Downloads:**
+- 🎯 **Modrinth:** [christmas-season](https://modrinth.com/plugin/christmas-season)
+- 📦 **GitHub:** [Releases](https://github.com/BoondockSulfur/ChristmasSeason/releases)
+
 ---
 
 ## 🎮 Commands
 
+### Main Commands
 | Command | Description | Permission |
 |---------|-------------|------------|
 | `/xmas on` | Activates ChristmasSeason | `christmas.admin` |
 | `/xmas off` | Deactivates and restores biomes | `christmas.admin` |
 | `/xmas status` | Shows status (active/inactive) | `christmas.admin` |
 | `/xmas reload` | Reloads configuration | `christmas.admin` |
+
+### Biome Commands
+| Command | Description | Permission |
+|---------|-------------|------------|
 | `/xmas biome set <biome> [radius]` | Manually sets biomes (only when active) | `christmas.admin` |
+| `/xmas biome status` | Shows snapshot database statistics | `christmas.admin` |
 | `/xmas biome clearsnap` | Deletes biome snapshot database | `christmas.admin` |
+| `/xmas biome compare <backup-ID>` | Compares current biomes with backup | `christmas.admin` |
+| `/xmas biome fix-diff <backup-ID> confirm` | Restores differences from backup | `christmas.admin` |
+
+### Backup Commands (NEW in v2.2!)
+| Command | Description | Permission |
+|---------|-------------|------------|
+| `/xmas backup list` | Shows all available backups | `christmas.admin` |
+| `/xmas backup restore <ID> confirm` | Restores from backup | `christmas.admin` |
+| `/xmas backup create` | Creates manual backup | `christmas.admin` |
+| `/xmas backup clear` | Deletes old timestamp backups | `christmas.admin` |
+
+### Update Commands (NEW in v2.2!)
+| Command | Description | Permission |
+|---------|-------------|------------|
+| `/xmas update check` | Checks for new plugin versions | `christmas.admin` |
 
 **Examples:**
-```
+```bash
+# Basic Usage
 /xmas on                          # Starts winter wonderland
 /xmas biome set snowy_plains 2    # Changes 5x5 chunks to snowy plains
 /xmas off                         # Restores everything back
+
+# Backup Management (NEW!)
+/xmas backup list                 # Show all backups
+/xmas backup restore 1 confirm    # Restore first backup
+/xmas backup create               # Manual backup
+
+# Biome Comparison (NEW!)
+/xmas biome compare SAFE          # Compare with SAFE backup
+/xmas biome fix-diff SAFE confirm # Fix differences
+
+# Updates (NEW!)
+/xmas update check                # Check for new versions
 ```
 
 ---
@@ -139,6 +205,14 @@ elves:
   enabled: true
   spawnIntervalSeconds: 60
   maxPerWorld: 4
+
+regionIntegration:
+  enabled: true
+  worldGuard:
+    allowInProtected: false   # Allow spawns in WG regions
+  griefPrevention:
+    allowInClaims: false      # Allow spawns in claims
+    allowInAdminClaims: false # Allow spawns in admin claims
 
 snowmen:
   enabled: true
@@ -222,9 +296,50 @@ snowmen:
 ### Problem: `/xmas biome set` doesn't work
 **Solution:** The command only works when ChristmasSeason is active (`/xmas on`)
 
+### Problem: Lost biome data after plugin deletion
+**Solution (NEW in v2.2!):**
+1. Check `world/christmas_backups/` for automatic backups
+2. `/xmas backup list` - List available backups
+3. `/xmas backup restore SAFE confirm` - Restore SAFE backup
+4. Alternative: `/xmas biome compare SAFE` to see what changed
+
+### Problem: Schneemänner spawning in water
+**Solution:** Fixed in v2.2.0! Update to latest version.
+
+### Problem: Wichtel/Schneemänner spawning on roofs or in trees
+**Solution:** Fixed in v2.2.0! Update to latest version.
+
 ---
 
 ## 🔄 Migration Guide
+
+### From v2.1.0 to v2.2.0
+
+**Highly recommended for all servers!** This update fixes critical bugs, adds region protection, and backup system.
+
+1. **Stop the server**
+2. **Replace the JAR** with `ChristmasSeason-2.2.0.jar`
+3. **Start the server** - done!
+
+**What's New:**
+- ✅ Config compatible (new `regionIntegration` section added automatically)
+- ✅ Database fully compatible
+- ✅ **NEW:** WorldGuard & GriefPrevention support (auto-detected)
+- ✅ **NEW:** Automatic backup system (SAFE/Timestamp/Emergency)
+- ✅ **NEW:** Update notifications for OPs
+- ✅ **NEW:** Biome comparison & recovery tools
+- ✅ **NEW:** Full tab completion for all commands
+- ✅ **NEW:** bStats metrics
+- ✅ **FIXED:** 17 bugs including 3 critical (backup system, Folia crashes, thread-safety)
+- ✅ **NEW:** 7 data loss protection measures
+
+**Optional:** Install WorldGuard or GriefPrevention for region protection.
+
+**First Start:**
+- Plugin will check for updates automatically
+- DB integrity check runs on startup
+- SAFE-Backup will be created on first `/xmas on`
+- Backups stored in `world/christmas_backups/` (survives plugin deletion!)
 
 ### From v2.0.0 to v2.1.0
 
@@ -260,6 +375,16 @@ snowmen:
 ## 📝 Changelog
 
 See [CHANGELOG.md](CHANGELOG.md) for detailed version history.
+
+**v2.2.0 Highlights (Latest):**
+- 🛡️ **NEW:** WorldGuard & GriefPrevention Integration (no spawns in protected areas)
+- 💾 **NEW:** Automatic Backup System (SAFE/Timestamp/Emergency backups)
+- 🔔 **NEW:** Update Checker with Modrinth/GitHub API integration
+- 🔍 **NEW:** Biome Comparison & Recovery Tools
+- ⌨️ **NEW:** Full Tab Completion for all commands
+- 📊 **NEW:** bStats Metrics (Plugin ID: 30930)
+- 🔒 **NEW:** 7 Enhanced Data Loss Protection measures
+- 🐛 **FIXED:** 17 bugs including 3 critical (backup system, Folia crashes, thread-safety)
 
 **v2.1.0 Highlights:**
 - 🔥 **CRITICAL:** Fixed Folia crashes during `/xmas off` (thread-safety violations)
@@ -298,6 +423,9 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 - **Paper API** 1.21.3-R0.1-SNAPSHOT
 - **FoliaLib** 0.4.3 (shaded & relocated)
 - **SQLite JDBC** 3.45.0.0 (shaded)
+- **bStats** 3.1.0 (shaded & relocated)
+- **WorldGuard API** 7.0.9 (provided, optional)
+- **GriefPrevention** (reflection-based, no dependency needed)
 
 ### Build:
 ```bash
@@ -320,4 +448,28 @@ scheduler.runForEntity(entity, () -> { ... });
 
 ---
 
-**Have fun with ChristmasSeason v2.0! 🎄❄️**
+## 🔧 Configuration Notes
+
+### Update Checker Configuration
+
+The plugin automatically checks for updates on Modrinth. If you've published the plugin on a different platform, you can configure the URLs in `UpdateChecker.java`:
+
+```java
+// UpdateChecker.java (lines 24-25)
+private static final String MODRINTH_SLUG = "christmas-season";
+private static final String GITHUB_REPO = "BoondockSulfur/ChristmasSeason";
+```
+
+Update notifications will appear:
+- In console on server start
+- For OPs when they join the server
+- On demand with `/xmas update check`
+
+---
+
+**Have fun with ChristmasSeason v2.2! 🎄❄️**
+
+**Support & Links:**
+- 🐛 **Issues:** [GitHub Issues](https://github.com/BoondockSulfur/ChristmasSeason/issues)
+- 💬 **Discussions:** [GitHub Discussions](https://github.com/BoondockSulfur/ChristmasSeason/discussions)
+- 📥 **Downloads:** [Modrinth](https://modrinth.com/plugin/christmas-season) | [GitHub Releases](https://github.com/BoondockSulfur/ChristmasSeason/releases)

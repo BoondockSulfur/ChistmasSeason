@@ -30,9 +30,9 @@ public class WichtelManager {
     // FOLIA FIX: Entity-basierte Steal-Tasks (Entity Scheduler pro Mob)
     private final Map<UUID, WrappedTask> entityStealTasks = new java.util.concurrent.ConcurrentHashMap<>();
 
-    // Tracker statt globale Scans
-    private final Set<UUID> trackedWichtel = new HashSet<>();
-    private final Set<UUID> trackedElfen   = new HashSet<>();
+    // Tracker statt globale Scans (FIX: thread-safe für Folia Location/Entity Scheduler)
+    private final Set<UUID> trackedWichtel = java.util.concurrent.ConcurrentHashMap.newKeySet();
+    private final Set<UUID> trackedElfen   = java.util.concurrent.ConcurrentHashMap.newKeySet();
 
     public WichtelManager(ChristmasSeason plugin) {
         this.plugin = plugin;
@@ -194,6 +194,12 @@ public class WichtelManager {
             // Safe-Spawn: 5 Versuche (Performance-optimiert, strenge Wasser/Wand-Checks)
             Location spawn = SpawnUtil.findSafeSpawnLocation(w, playerLoc, 10, 5);
 
+            // Region-Schutz: Kein Spawn in geschützten Bereichen
+            if (plugin.getRegionIntegration() != null && !plugin.getRegionIntegration().canSpawnAt(spawn)) {
+                plugin.debug("Wichtel spawn blocked by region protection at " + spawn.getBlockX() + "," + spawn.getBlockZ());
+                return;
+            }
+
             Zombie z = (Zombie) w.spawnEntity(spawn, EntityType.ZOMBIE);
             z.setBaby(true);
             z.setCustomName(lang.get("entity.wichtel"));
@@ -241,6 +247,12 @@ public class WichtelManager {
         scheduler.runAtLocation(playerLoc, () -> {
             // Safe-Spawn: 5 Versuche (Performance-optimiert, strenge Wasser/Wand-Checks)
             Location spawn = SpawnUtil.findSafeSpawnLocation(w, playerLoc, 10, 5);
+
+            // Region-Schutz: Kein Spawn in geschützten Bereichen
+            if (plugin.getRegionIntegration() != null && !plugin.getRegionIntegration().canSpawnAt(spawn)) {
+                plugin.debug("Elf spawn blocked by region protection at " + spawn.getBlockX() + "," + spawn.getBlockZ());
+                return;
+            }
 
             Allay a = (Allay) w.spawnEntity(spawn, EntityType.ALLAY);
             a.setCustomName(lang.get("entity.elf"));

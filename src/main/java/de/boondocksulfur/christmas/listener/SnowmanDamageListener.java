@@ -17,8 +17,8 @@ public class SnowmanDamageListener implements Listener {
 
         // Direkter Schlag vom Schneemann
         if (damager instanceof Snowman sm && sm.getScoreboardTags().contains(SnowmanManager.TAG)) {
+            // FIX: Nur setCancelled - setDamage(0) nach Cancel kann auf manchen Servern Probleme machen
             e.setCancelled(true);
-            e.setDamage(0);
             return;
         }
 
@@ -27,7 +27,6 @@ public class SnowmanDamageListener implements Listener {
             ProjectileSource src = proj.getShooter();
             if (src instanceof Snowman sm && sm.getScoreboardTags().contains(SnowmanManager.TAG)) {
                 e.setCancelled(true);
-                e.setDamage(0);
             }
         }
     }

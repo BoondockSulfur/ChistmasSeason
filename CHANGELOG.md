@@ -2,6 +2,38 @@
 
 All notable changes to the ChristmasSeason plugin will be documented in this file.
 
+## [2.2.0] - 2026-04-25
+
+**Major Update:** Region protection, backup system, update checker, bug fixes, data safety, tab completion, and bStats.
+
+**Upgrade Priority:** HIGH - Critical thread-safety and data integrity fixes
+
+### Added
+- **WorldGuard & GriefPrevention** - No spawns in protected regions/claims (soft dependency, configurable)
+- **Automatic Backup System** - SAFE/Timestamp/Emergency backups in `world/christmas_backups/`
+- **Update Checker** - Modrinth + GitHub fallback, OP notifications on join
+- **Biome Compare & Fix** - `/xmas biome compare` and `/xmas biome fix-diff` for recovery
+- **Full Tab Completion** - Context-aware suggestions for all commands
+- **bStats Metrics** (Plugin ID: 30930)
+- **Startup Safety Checks** - DB integrity check, crash detection, missing-DB warnings
+- **Data Loss Protection** - `clearsnap` blocked when active, backup failure warnings, smart rotation
+- Entity spawn fixes: No more spawns on roofs, in trees, or in water
+
+### Fixed (17 Bugs)
+- **CRITICAL:** Backup system non-functional (wrong DB filename)
+- **CRITICAL:** Folia crash on start/join (`Bukkit.getScheduler()` → `FoliaSchedulerHelper`)
+- **HIGH:** 6 thread-safety issues (restore counters, restore guard, HashSets, SQLite, LanguageManager)
+- **HIGH:** Restore permanently blocked after empty snapshot or null DB
+- **MEDIUM:** Cave biomes overwritten during seed-restore (Y=64 only → per Y-level)
+- **MEDIUM:** NPE in `stopFeatures()` on failed startup
+- **MEDIUM:** SnowstormManager orphaned tasks after `stop()`
+- **LOW:** DB header EOF check, version parse fix, SnowmanDamageListener cleanup
+
+### Changed
+- `softdepend: [WorldGuard, GriefPrevention]` in plugin.yml
+- New `regionIntegration` config section
+- Intelligent backup rotation (largest backup never deleted)
+
 ## [2.1.0] - 2025-12-25
 
 **Minor Update:** Critical Folia compatibility fixes and complete internationalization overhaul.

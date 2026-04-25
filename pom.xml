@@ -5,7 +5,7 @@
 
     <groupId>de.boondocksulfur</groupId>
     <artifactId>christmas-season</artifactId>
-    <version>2.1.0</version>
+    <version>2.2.0</version>
     <name>ChristmasSeason</name>
 
     <!-- wenn euer Server noch auf Java 17 läuft: 17 eintragen -->
@@ -24,6 +24,14 @@
             <id>tcoded-releases</id>
             <url>https://repo.tcoded.com/releases</url>
         </repository>
+        <repository>
+            <id>codemc-repo</id>
+            <url>https://repo.codemc.io/repository/maven-public/</url>
+        </repository>
+        <repository>
+            <id>sk89q-repo</id>
+            <url>https://maven.enginehub.org/repo/</url>
+        </repository>
     </repositories>
 
     <dependencies>
@@ -39,6 +47,22 @@
             <groupId>com.tcoded</groupId>
             <artifactId>FoliaLib</artifactId>
             <version>0.4.3</version>
+        </dependency>
+
+        <!-- WorldGuard API (Soft Dependency - nur für Compile, nicht im JAR) -->
+        <dependency>
+            <groupId>com.sk89q.worldguard</groupId>
+            <artifactId>worldguard-bukkit</artifactId>
+            <version>7.0.9</version>
+            <scope>provided</scope>
+        </dependency>
+
+        <!-- bStats Metrics -->
+        <dependency>
+            <groupId>org.bstats</groupId>
+            <artifactId>bstats-bukkit</artifactId>
+            <version>3.1.0</version>
+            <scope>compile</scope>
         </dependency>
 
         <!-- SQLite JDBC Driver für Biome-Snapshot Datenbank -->
@@ -86,11 +110,17 @@
                                     <pattern>com.tcoded.folialib</pattern>
                                     <shadedPattern>de.boondocksulfur.christmas.libs.folialib</shadedPattern>
                                 </relocation>
+                                <relocation>
+                                    <pattern>org.bstats</pattern>
+                                    <shadedPattern>de.boondocksulfur.christmas.libs.bstats</shadedPattern>
+                                </relocation>
                             </relocations>
                             <artifactSet>
                                 <includes>
                                     <include>org.xerial:sqlite-jdbc</include>
                                     <include>com.tcoded:FoliaLib</include>
+                                    <include>org.bstats:bstats-bukkit</include>
+                                    <include>org.bstats:bstats-base</include>
                                 </includes>
                             </artifactSet>
                         </configuration>

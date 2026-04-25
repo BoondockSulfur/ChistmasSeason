@@ -27,7 +27,8 @@ public class GiftManager {
     private final Map<UUID, WrappedTask> playerSpawnTasks = new java.util.concurrent.ConcurrentHashMap<>();
 
     // OPTIMIERUNG: Tracke gespawnte Geschenk-Locations statt alle Chunks zu durchsuchen
-    private final Set<Location> trackedGifts = new HashSet<>();
+    // FIX: thread-safe für Folia Location Scheduler
+    private final Set<Location> trackedGifts = java.util.concurrent.ConcurrentHashMap.newKeySet();
 
     public GiftManager(ChristmasSeason plugin) {
         this.plugin = plugin;
@@ -130,6 +131,13 @@ public class GiftManager {
         scheduler.runAtLocation(playerLoc, () -> {
             // Safe-Spawn: 5 Versuche (Performance-optimiert, strenge Wasser/Wand-Checks)
             Location loc = SpawnUtil.findSafeSpawnLocation(w, playerLoc, 8, 5);
+
+            // Region-Schutz: Kein Spawn in geschützten Bereichen
+            if (plugin.getRegionIntegration() != null && !plugin.getRegionIntegration().canSpawnAt(loc)) {
+                plugin.debug("Gift spawn blocked by region protection at " + loc.getBlockX() + "," + loc.getBlockZ());
+                return;
+            }
+
             spawnGift(w, loc);
         });
     }

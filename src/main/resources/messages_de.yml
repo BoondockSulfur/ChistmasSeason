@@ -8,7 +8,7 @@ no-permission: "&cKeine Berechtigung."
 
 # Commands - /xmas
 command:
-  usage: "&b/xmas &7<on|off|status|reload|biome|storm>"
+  usage: "&b/xmas &7<on|off|status|reload|biome|storm|backup|update>"
 
   # ON (Quotes needed because YAML interprets 'on' as boolean)
   "on":
@@ -31,7 +31,7 @@ command:
 
   # BIOME
   biome:
-    usage: "&b/xmas biome &7<set|restore|clearsnap|status>"
+    usage: "&b/xmas biome &7<set|restore|clearsnap|status|compare|fix-diff>"
 
     set:
       usage: "&b/xmas biome set &e<BIOME> &7[radius_chunks]"
@@ -179,6 +179,33 @@ log:
     average-per-chunk: "Durchschnitt pro Chunk: {0} bytes"
     stats-footer: "=================================="
     error-retrieving-stats: "Fehler beim Abrufen der Statistiken: {0}"
+
+  # Backup-System
+  backup:
+    directory-created: "§aBackup-Verzeichnis erstellt: {0}"
+    safe-created: "§a✓ SAFE-Backup erstellt in '{0}' ({1} KB)"
+    timestamp-created: "§a✓ Backup erstellt: {0} ({1} KB)"
+    emergency-created: "§c✗ NOTFALL-Backup erstellt: {0} ({1} KB)"
+    emergency-warning: "§c  → Server wurde gestoppt während xmas ON aktiv war!"
+    error-creating-safe: "§cFehler beim Erstellen des SAFE-Backups: {0}"
+    error-creating-timestamp: "§cFehler beim Erstellen des Timestamp-Backups: {0}"
+    error-creating-emergency: "§cFehler beim Erstellen des Notfall-Backups: {0}"
+    error-deleting: "§cFehler beim Löschen von Backup '{0}'"
+    file-not-found: "§cBackup-Datei nicht gefunden: {0}"
+    closing-database: "§7Schließe Datenbank für Backup-Wiederherstellung..."
+    restored: "§a✓ Backup '{0}' wiederhergestellt ({1} KB)"
+    error-restoring: "§cFehler beim Wiederherstellen des Backups: {0}"
+    database-reopened: "§aDatenbank neu geöffnet."
+    cleared: "§a{0} Backup(s) gelöscht."
+    list-header: "§6═══ BACKUPS ═══"
+    list-entry: "§7  [{0}] §f{1} §7({2} KB)"
+    list-empty: "§7Keine Backups vorhanden."
+    list-footer: "§6════════════════"
+    restore-usage: "§b/xmas backup restore §e<ID>"
+    invalid-id: "§cUngültige Backup-ID."
+    restore-confirm: "§aBitte bestätige Wiederherstellung:"
+    restore-warning: "§c  Aktuelle Datenbank wird ersetzt!"
+    restore-command: "§e  /xmas backup restore {0} confirm"
 
   # Debug-Logs (nur mit /xmas debug verbose sichtbar)
   debug:
